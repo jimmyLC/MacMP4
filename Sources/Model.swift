@@ -40,22 +40,28 @@ final class JobStore: ObservableObject {
     @Published var overwrite = false
     @Published var allowReencode = true
     @Published var hardwareAccel = true
-    @Published var autoStart = true
+    @Published var autoStart = false
     @Published var flashMessage: String?
 
+    private var jobObservers: [UUID: AnyCancellable] = [:]
     private var pending: [Job] = []
     private var pendingIDs = Set<UUID>()
     private let lock = NSLock()
-    private var stopRequested = false
+    private let stopLock = NSLock()
+    private var stopped = false
+    private var stopRequested: Bool {
+        get { stopLock.lock(); defer { stopLock.unlock() }; return stopped }
+        set { stopLock.lock(); defer { stopLock.unlock() }; stopped = newValue }
+    }
     private var currentProcess: Process?
     private var procLock = NSLock()
     private let worker = DispatchQueue(label: "macmp4.worker", qos: .userInitiated)
 
     static let videoExtensions: Set<String> = supportedVideoExtensions
 
-    init() {
-        ffmpeg = FF.findTool("ffmpeg")
-        ffprobe = FF.findTool("ffprobe")
+    init(ffmpeg: String? = FF.findTool("ffmpeg"), ffprobe: String? = FF.findTool("ffprobe")) {
+        self.ffmpeg = ffmpeg
+        self.ffprobe = ffprobe
     }
 
     // MARK: - 對外操作(全部在主執行緒呼叫)
@@ -68,12 +74,20 @@ final class JobStore: ObservableObject {
         jobs.filter { if case .done = $0.status { return true } else { return false } }.count
     }
 
+    var waitingCount: Int { jobs.filter { $0.status == .waiting }.count }
+    var failedCount: Int { jobs.filter { if case .failed = $0.status { return true }; return false }.count }
+    var finishedCount: Int {
+        jobs.filter { switch $0.status { case .done, .skipped: return true; default: return false } }.count
+    }
+    var processedCount: Int { finishedCount + failedCount }
+    var totalBytes: Int64 { jobs.reduce(0) { $0 + $1.size } }
+
     var overallProgress: Double {
         guard !jobs.isEmpty else { return 0 }
         var total = 0.0
         for j in jobs {
             switch j.status {
-            case .done, .skipped: total += 1
+            case .done, .failed, .skipped: total += 1
             case .converting(let p, _, _): total += max(0, p) / 100
             default: break
             }
@@ -122,6 +136,11 @@ final class JobStore: ObservableObject {
         newJobs.sort {
             $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending
         }
+        for job in newJobs {
+            jobObservers[job.id] = job.objectWillChange.sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+        }
         if !newJobs.isEmpty { jobs.append(contentsOf: newJobs) }
         if ignored > 0 { flash("已忽略 \(ignored) 個不支援的檔案") }
         if autoStart { start() }
@@ -142,11 +161,12 @@ final class JobStore: ObservableObject {
         procLock.lock()
         let p = currentProcess
         procLock.unlock()
-        p?.terminate()
+        if let p, p.isRunning { p.terminate() }
     }
 
     func remove(_ job: Job) {
-        if case .converting = job.status { return }
+        switch job.status { case .probing, .converting: return; default: break }
+        jobObservers.removeValue(forKey: job.id)
         jobs.removeAll { $0.id == job.id }
         lock.lock()
         pending.removeAll { $0.id == job.id }
@@ -164,7 +184,9 @@ final class JobStore: ObservableObject {
     func clearFinished() {
         jobs.removeAll { j in
             switch j.status {
-            case .done, .failed, .skipped: return true
+            case .done, .skipped:
+                jobObservers.removeValue(forKey: j.id)
+                return true
             default: return false
             }
         }
@@ -222,6 +244,19 @@ final class JobStore: ObservableObject {
         DispatchQueue.main.async { job.status = s }
     }
 
+    private func track(_ process: Process) {
+        procLock.lock()
+        currentProcess = process
+        procLock.unlock()
+        // Covers Stop arriving between the worker's check and process launch.
+        if stopRequested, process.isRunning { process.terminate() }
+    }
+
+    private func probe(_ url: URL, using ffprobe: String) -> ProbeResult? {
+        defer { procLock.lock(); currentProcess = nil; procLock.unlock() }
+        return FF.probe(url: url, ffprobe: ffprobe, didStart: { [weak self] in self?.track($0) })
+    }
+
     private func process(_ job: Job) {
         guard let ffmpeg, let ffprobe else { return }
         let fm = FileManager.default
@@ -247,8 +282,8 @@ final class JobStore: ObservableObject {
 
         let startTime = Date()
         setStatus(job, .probing)
-        guard let probe = FF.probe(url: job.url, ffprobe: ffprobe) else {
-            setStatus(job, .failed("無法讀取檔案"))
+        guard let probe = self.probe(job.url, using: ffprobe) else {
+            setStatus(job, stopRequested ? .waiting : .failed("無法讀取檔案"))
             return
         }
         DispatchQueue.main.async { job.duration = probe.duration }
@@ -263,16 +298,22 @@ final class JobStore: ObservableObject {
             return
         }
 
+        let transaction: OutputTransaction
+        do { transaction = try OutputTransaction(destination: outURL, overwrite: overwrite) }
+        catch {
+            setStatus(job, .failed(error.localizedDescription))
+            return
+        }
+
         for strategy in strategies {
             if stopRequested { setStatus(job, .waiting); return }
 
             setStatus(job, .converting(percent: probe.duration == nil ? -1 : 0, speed: "", label: strategy.label))
 
-            let ok = FF.run(ffmpeg: ffmpeg, input: job.url, output: outURL, strategy: strategy,
+            let ok = FF.run(ffmpeg: ffmpeg, input: job.url, output: transaction.temporaryURL, strategy: strategy,
                             duration: probe.duration,
                             didStart: { [weak self] p in
-                                guard let self else { return }
-                                self.procLock.lock(); self.currentProcess = p; self.procLock.unlock()
+                                self?.track(p)
                             },
                             progress: { [weak self] pct, speed in
                                 self?.setStatus(job, .converting(percent: pct, speed: speed, label: strategy.label))
@@ -280,13 +321,20 @@ final class JobStore: ObservableObject {
 
             procLock.lock(); currentProcess = nil; procLock.unlock()
 
-            if ok, let outProbe = FF.probe(url: outURL, ffprobe: ffprobe), (outProbe.duration ?? 0) > 0.5 {
+            if stopRequested { setStatus(job, .waiting); return }
+            if ok, let outProbe = self.probe(transaction.temporaryURL, using: ffprobe), outProbe.isValidOutput {
+                if stopRequested { setStatus(job, .waiting); return }
+                do { try transaction.commit() }
+                catch {
+                    setStatus(job, .failed("無法儲存輸出: \(error.localizedDescription)"))
+                    return
+                }
                 DispatchQueue.main.async { job.outURL = outURL }
                 setStatus(job, .done(strategy: strategy.label, elapsed: Date().timeIntervalSince(startTime)))
                 return
             }
 
-            try? fm.removeItem(at: outURL)
+            transaction.discardAttempt()
             if stopRequested { setStatus(job, .waiting); return }
         }
 

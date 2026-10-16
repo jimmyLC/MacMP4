@@ -114,12 +114,19 @@ for (idx, input) in files.enumerated() {
         continue
     }
 
+    let transaction: OutputTransaction
+    do { transaction = try OutputTransaction(destination: out, overwrite: overwrite) }
+    catch {
+        print("    ✗ \(error.localizedDescription)")
+        failures += 1
+        continue
+    }
     var succeeded = false
     let t0 = Date()
     for strategy in strategies {
         print("    → \(strategy.label)…")
         var lastPrint = Date.distantPast
-        let ok = FF.run(ffmpeg: ffmpeg, input: input, output: out, strategy: strategy, duration: probe.duration) { pct, speed in
+        let ok = FF.run(ffmpeg: ffmpeg, input: input, output: transaction.temporaryURL, strategy: strategy, duration: probe.duration) { pct, speed in
             // 每 0.5 秒最多更新一次終端機
             let now = Date()
             guard now.timeIntervalSince(lastPrint) > 0.5 else { return }
@@ -130,14 +137,19 @@ for (idx, input) in files.enumerated() {
             fflush(stdout)
         }
         print("\r" + String(repeating: " ", count: 40) + "\r", terminator: "")
-        if ok, let outProbe = FF.probe(url: out, ffprobe: ffprobe), (outProbe.duration ?? 0) > 0.5 {
+        if ok, let outProbe = FF.probe(url: transaction.temporaryURL, ffprobe: ffprobe), outProbe.isValidOutput {
+            do { try transaction.commit() }
+            catch {
+                print("    ✗ 無法儲存輸出: \(error.localizedDescription)")
+                break
+            }
             var durStr = ""
             if let d = outProbe.duration { durStr = "(\(formatDuration(d)))" }
             print("    ✓ 完成 \(durStr) → \(out.lastPathComponent),耗時 \(formatElapsed(Date().timeIntervalSince(t0)))")
             succeeded = true
             break
         }
-        try? fm.removeItem(at: out)
+        transaction.discardAttempt()
     }
     if !succeeded {
         print("    ✗ 轉換失敗(來源檔可能損壞)")

@@ -26,23 +26,20 @@ swiftc -O -swift-version 5 -target "$TARGET" \
 echo "==> 產生圖示"
 ICONSET="$BUILD_DIR/AppIcon.iconset"
 mkdir -p "$ICONSET"
-if swift assets/makeicon.swift "$BUILD_DIR/icon_1024.png" >/dev/null 2>&1; then
-    gen() { sips -z "$1" "$1" "$BUILD_DIR/icon_1024.png" --out "$ICONSET/$2" >/dev/null; }
-    gen 16   icon_16x16.png
-    gen 32   icon_16x16@2x.png
-    gen 32   icon_32x32.png
-    gen 64   icon_32x32@2x.png
-    gen 128  icon_128x128.png
-    gen 256  icon_128x128@2x.png
-    gen 256  icon_256x256.png
-    gen 512  icon_256x256@2x.png
-    gen 512  icon_512x512.png
-    gen 1024 icon_512x512@2x.png
-    iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" \
-        && echo "    圖示完成" || echo "    (icns 轉換失敗,使用系統預設圖示)"
-else
-    echo "    (圖示產生失敗,使用系統預設圖示)"
-fi
+swift assets/makeicon.swift "$BUILD_DIR/icon_1024.png"
+gen() { sips -z "$1" "$1" "$BUILD_DIR/icon_1024.png" --out "$ICONSET/$2" >/dev/null; }
+gen 16   icon_16x16.png
+gen 32   icon_16x16@2x.png
+gen 32   icon_32x32.png
+gen 64   icon_32x32@2x.png
+gen 128  icon_128x128.png
+gen 256  icon_128x128@2x.png
+gen 256  icon_256x256.png
+gen 512  icon_256x256@2x.png
+gen 512  icon_512x512.png
+gen 1024 icon_512x512@2x.png
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+echo "    圖示完成"
 
 echo "==> Info.plist"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
