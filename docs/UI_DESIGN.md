@@ -55,3 +55,19 @@ Remaining checks: runtime appearance on macOS 13–15, light mode, VoiceOver nar
 ## Primary action contrast correction
 
 Replaced the system prominent-button rendering inside the glass shelf with an explicit native ButtonStyle: opaque white semibold label and arrow over a solid deep-blue capsule. The specified enabled colors have a calculated contrast ratio of 5.87:1. Disabled state uses a neutral system surface and readable grey text instead of reducing the opacity of the entire button. Inspected both states in the running app using a disposable waiting fixture, then removed it from the queue. Build and existing regression suite passed.
+
+## Free / Pro appearance controls
+
+Keep the existing native palette: workspace #F4F6F9, content #FFFFFF, ink #1D2433, secondary #687385, accent #2670E8; use semantic system equivalents so Pro dark mode follows native surfaces. SF system type remains unchanged. A small 11 pt capsule beside the app title identifies the edition: neutral Free, blue Pro. No crown, gradient or purchase popover on launch.
+
+Appearance lives above Language in the inspector and opens one panel with Light, Dark and System rows. Free always uses Light, including when macOS or a saved Pro preference is dark. Dark and System remain visible with locks; selecting one explains the Pro feature without changing the workspace. Pro changes apply immediately, persist across launches, and System delegates switching to macOS. Native file panels use the same effective appearance. A revoked entitlement immediately returns to Light while preserving the Pro preference for later restoration.
+
+Production starts Free. AppAccess is an injectable entitlement boundary, not a payment verifier; no tier is trusted from UserDefaults or environment variables. A future verified license provider may update it. Developer Pro previews require the explicit MACMP4_PREVIEW_PRO compiler flag; the release build script never enables it. The panel states Pro upgrades are coming soon, since purchase and serial activation are outside this change.
+
+### Appearance verification (2026-10-16)
+
+- arm64 build and all regressions passed, including 157 localized English keys.
+- Isolated Free app: badge and Light inspector label visible, Traditional Chinese language switch works, clicking Dark shows the Pro explanation and leaves Light selected.
+- Isolated compile-time Pro preview: badge visible, Light/Dark/System each selected successfully, Dark sheet visually inspected. No user system appearance setting changed.
+- Preferences tested in isolated UserDefaults domains: persistence, invalid-value fallback, Free rejection of dark/system, entitlement revocation/restoration, and no unlock through unrelated isPro/tier defaults.
+- Payment, serial/email validation and automatic paid activation are not implemented in this change. Existing v1 release and installed application are unchanged.

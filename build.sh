@@ -16,7 +16,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 echo "==> 編譯 GUI (${ARCH})"
 swiftc -O -swift-version 5 -parse-as-library -target "$TARGET" \
-    Sources/Engine.swift Sources/Model.swift Sources/ToolSetup.swift Sources/App.swift \
+    Sources/Engine.swift Sources/Model.swift Sources/ToolSetup.swift Sources/AppAccess.swift Sources/AppearanceView.swift Sources/App.swift \
     -o "$APP/Contents/MacOS/$APP_NAME"
 
 echo "==> 編譯 CLI"

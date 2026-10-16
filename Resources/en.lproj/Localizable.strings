@@ -183,3 +183,43 @@
 "FFmpeg 正在安裝，完成後會結束 MacMP4。" = "FFmpeg is installing. MacMP4 will quit when installation finishes.";
 
 "在背景安裝" = "Continue in Background";
+
+"Pro 版本" = "Pro edition";
+
+"Free 版本" = "Free edition";
+
+"淺色" = "Light";
+
+"深色" = "Dark";
+
+"明亮清楚的工作區" = "A bright, clear workspace";
+
+"降低工作區亮度" = "A darker workspace";
+
+"隨 macOS 外觀設定自動切換" = "Automatically match the appearance of macOS";
+
+"外觀" = "Appearance";
+
+"選擇適合你的工作區外觀。" = "Choose the appearance of your workspace.";
+
+"Free 提供完整轉檔功能，使用淺色外觀。" = "Free includes all conversion features with a light appearance.";
+
+"Pro · NT$90 終身買斷" = "Pro · NT$90 lifetime purchase";
+
+"包含 Pro 標誌、深色外觀與跟隨系統自動切換。Pro 升級即將開放。" = "Includes the Pro badge, dark appearance and automatic system appearance. Pro upgrades are coming soon.";
+
+"Pro 外觀功能" = "Pro Appearance";
+
+"知道了" = "Got It";
+
+"深色與跟隨系統是 Pro 功能。Pro 為 NT$90 終身買斷，升級即將開放；轉檔功能維持免費。" = "Dark and system appearance require Pro. Pro is a one-time NT$90 lifetime purchase, coming soon. Conversion features remain free.";
+
+"Pro 功能，尚未解鎖" = "Pro feature, locked";
+
+"已選取" = "Selected";
+
+"未選取" = "Not selected";
+
+"Pro 可使用此功能" = "Available with Pro";
+
+"版本與外觀設定" = "Edition and appearance settings";
