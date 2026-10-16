@@ -146,3 +146,5 @@ Apple Silicon 版本請至 [GitHub Release v1](https://github.com/jimmyLC/MacMP4
 從原始碼建置需使用包含 macOS 26 SDK 或更新 SDK 的 Xcode，執行 `./build-dmg.sh`。安裝包包含 MacMP4.app、Applications 捷徑、LICENSE 與中英安裝說明；腳本會驗證映像並產生 build/SHA256SUMS.txt。App 顯示版本以 VERSION 為準。
 
 MacMP4 開啟時會檢查 FFmpeg 與 ffprobe。缺少工具時會顯示設定引導；已安裝 Homebrew 可直接按「安裝 FFmpeg」，查看安裝訊息，失敗時可重試。沒有 Homebrew 則提供官方安裝說明。返回 App 後自動重新檢查，不必重開。Homebrew 目前正式支援 macOS 15 以上，較舊系統需自行安裝相容工具。
+
+Free 顯示 Free 標誌並固定使用淺色外觀。Pro 顯示 Pro 標誌，可選擇淺色、深色與跟隨系統，並記住外觀偏好。Free 保留完整轉檔功能。Pro 規劃為 NT$90 終身買斷；付款及 Email／序號啟用尚未串接，目前正式建置預設為 Free。開發預覽可用 `-D MACMP4_PREVIEW_PRO` 編譯，build.sh 不會啟用此旗標。

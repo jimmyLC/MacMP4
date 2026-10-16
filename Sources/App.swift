@@ -7,10 +7,20 @@ struct MacMP4App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = JobStore.shared
     @State private var showingAbout = false
+    #if MACMP4_PREVIEW_PRO
+    @StateObject private var access = AppAccess(tier: .pro)
+    #else
+    @StateObject private var access = AppAccess()
+    #endif
 
     var body: some Scene {
         WindowGroup("MacMP4") {
-            ContentView(showingAbout: $showingAbout).environmentObject(store).id(store.appLanguage)
+            ContentView(showingAbout: $showingAbout)
+                .environmentObject(store).environmentObject(access)
+                .preferredColorScheme(access.preferredColorScheme)
+                .onAppear { access.applyNativeAppearance() }
+                .onChange(of: access.effectiveAppearance) { _ in access.applyNativeAppearance() }
+                .id(store.appLanguage)
         }
         .defaultSize(width: 960, height: 660)
         .windowStyle(.hiddenTitleBar)
@@ -86,10 +96,12 @@ private struct PrimaryActionStyle: ButtonStyle {
 struct ContentView: View {
     @Binding var showingAbout: Bool
     @EnvironmentObject var store: JobStore
+    @EnvironmentObject private var access: AppAccess
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dropTargeted = false
     @State private var advancedExpanded = false
     @State private var showingToolSetup = false
+    @State private var showingAppearance = false
 
     private var toolsAvailable: Bool { store.ffmpeg != nil && store.ffprobe != nil }
     private var outputName: String {
@@ -110,7 +122,8 @@ struct ContentView: View {
         .frame(minWidth: 820, minHeight: 580)
         .background(Color(nsColor: .windowBackgroundColor))
         .tint(.blue)
-        .sheet(isPresented: $showingAbout) { AboutView() }
+        .sheet(isPresented: $showingAbout) { AboutView().environmentObject(access) }
+        .sheet(isPresented: $showingAppearance) { AppearanceView().environmentObject(access) }
         .sheet(isPresented: $showingToolSetup) { ToolSetupView().environmentObject(store) }
         .onAppear {
             store.refreshTools()
@@ -137,7 +150,11 @@ struct ContentView: View {
                 .frame(width: 28, height: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text("MacMP4").font(.system(size: 20, weight: .semibold))
+                HStack(spacing: 9) {
+                    Text("MacMP4").font(.system(size: 20, weight: .semibold))
+                    Button { showingAppearance = true } label: { PlanBadge(tier: access.tier) }
+                        .buttonStyle(.plain).help(L("版本與外觀設定"))
+                }
                 Text(L("影片轉檔，簡單完成")).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -283,6 +300,16 @@ struct ContentView: View {
             }.padding(20)
             }
             Divider().padding(.horizontal, 20)
+            Button { showingAppearance = true } label: {
+                HStack {
+                    Label(L("外觀"), systemImage: "circle.lefthalf.filled")
+                    Spacer()
+                    Text(access.effectiveAppearance.title).foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
+                }.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain).font(.callout)
+            .padding(.horizontal, 20).padding(.top, 14)
             Picker(L("語言"), selection: $store.appLanguage) {
                 Text(L("跟隨系統")).tag("system")
                 Text("繁體中文").tag("zh-Hant")
@@ -482,6 +509,7 @@ struct JobRow: View {
 }
 
 private struct AboutView: View {
+    @EnvironmentObject private var access: AppAccess
     @Environment(\.dismiss) private var dismiss
     @State private var licenseExpanded = false
 
@@ -495,7 +523,10 @@ private struct AboutView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("MacMP4").font(.system(size: 26, weight: .semibold))
+            HStack(spacing: 10) {
+                Text("MacMP4").font(.system(size: 26, weight: .semibold))
+                PlanBadge(tier: access.tier)
+            }
             Text("Copyright © 2026 JimmyLC").font(.callout)
             HStack {
                 Text(L("開發者：JimmyLC"))
