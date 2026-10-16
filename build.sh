@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="MacMP4"
+VERSION=$(cat VERSION)
 BUILD_DIR="build"
 APP="$BUILD_DIR/$APP_NAME.app"
 ARCH=$(uname -m)
@@ -43,6 +44,8 @@ echo "    圖示完成"
 
 echo "==> 語系資源"
 cp -R Resources/*.lproj "$APP/Contents/Resources/"
+cp LICENSE "$APP/Contents/Resources/LICENSE"
+cp LICENSE "$BUILD_DIR/LICENSE"
 
 echo "==> Info.plist"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -57,7 +60,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key><string>local.jimmy.MacMP4</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleVersion</key><string>2</string>
+    <key>NSHumanReadableCopyright</key><string>Copyright © 2026 JimmyLC. Free for noncommercial use only.</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>NSHighResolutionCapable</key><true/>
@@ -78,6 +82,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 
 echo "==> Ad-hoc 簽名"
 codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true

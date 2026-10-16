@@ -6,15 +6,19 @@ import UniformTypeIdentifiers
 struct MacMP4App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = JobStore.shared
+    @State private var showingAbout = false
 
     var body: some Scene {
         WindowGroup("MacMP4") {
-            ContentView().environmentObject(store).id(store.appLanguage)
+            ContentView(showingAbout: $showingAbout).environmentObject(store).id(store.appLanguage)
         }
         .defaultSize(width: 960, height: 660)
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .appInfo) {
+                Button(L("關於 MacMP4")) { showingAbout = true }
+            }
         }
     }
 }
@@ -77,6 +81,7 @@ private struct PrimaryActionStyle: ButtonStyle {
 }
 
 struct ContentView: View {
+    @Binding var showingAbout: Bool
     @EnvironmentObject var store: JobStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dropTargeted = false
@@ -101,6 +106,7 @@ struct ContentView: View {
         .frame(minWidth: 820, minHeight: 580)
         .background(Color(nsColor: .windowBackgroundColor))
         .tint(.blue)
+        .sheet(isPresented: $showingAbout) { AboutView() }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted, perform: handleDrop)
         .overlay {
             if dropTargeted {
@@ -273,7 +279,14 @@ struct ContentView: View {
                 Text("繁體中文").tag("zh-Hant")
                 Text("English").tag("en")
             }
-            .pickerStyle(.menu).font(.callout).padding(20)
+            .pickerStyle(.menu).font(.callout)
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
+            HStack {
+                Text("© 2026 JimmyLC").foregroundStyle(.secondary)
+                Spacer()
+                Button(L("關於與授權")) { showingAbout = true }.buttonStyle(.link)
+            }
+            .font(.caption).padding(.horizontal, 20).padding(.bottom, 16)
         }
     }
 
@@ -457,4 +470,46 @@ struct JobRow: View {
         }
     }
     private func reveal() { NSWorkspace.shared.activateFileViewerSelecting([job.outURL ?? job.url]) }
+}
+
+private struct AboutView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var licenseExpanded = false
+
+    private var licenseText: String {
+        guard let url = Bundle.main.url(forResource: "LICENSE", withExtension: nil),
+              let text = try? String(contentsOf: url, encoding: .utf8) else {
+            return L("原始碼公開，非商業用途免費。禁止商業用途。")
+        }
+        return text
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("MacMP4").font(.system(size: 26, weight: .semibold))
+            Text("Copyright © 2026 JimmyLC").font(.callout)
+            HStack {
+                Text(L("開發者：JimmyLC"))
+                Spacer()
+                Link("jimmy-tools.com", destination: URL(string: "https://jimmy-tools.com/")!)
+            }.font(.callout)
+            Divider()
+            Text(L("原始碼公開，非商業用途免費。禁止商業用途。"))
+                .font(.headline).fixedSize(horizontal: false, vertical: true)
+            Text(L("可研究、修改與分享，須保留版權及授權聲明。商業用途須另行取得書面授權。"))
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            DisclosureGroup(L("完整授權條款"), isExpanded: $licenseExpanded) {
+                ScrollView {
+                    Text(licenseText).font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 10)
+                }.frame(height: 180)
+            }.font(.callout)
+            HStack {
+                Spacer()
+                Button(L("關閉")) { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+        }.padding(28).frame(width: 480)
+    }
 }

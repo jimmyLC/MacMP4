@@ -119,7 +119,13 @@ build.sh                建置腳本
 
 ## 授權
 
-[MIT](LICENSE)
+[MacMP4 非商業用途授權 1.0](LICENSE)
+
+Copyright © 2026 **JimmyLC** · [開發者網站](https://jimmy-tools.com/)
+
+原始碼公開，可免費用於非商業用途，也可研究、修改及分享，但須保留版權聲明、開發者姓名、網站與授權條款。**禁止商業用途**，包含企業業務、專業或客戶工作、付費轉檔服務及整合至商業產品；商業用途須另行取得 JimmyLC 的書面授權。
+
+此為附有非商業限制的原始碼公開授權，不屬於 OSI 定義的開源授權。先前已以 MIT 釋出的版本及已授出的權利不受影響；第三方工具仍適用各自授權。完整條款以英文 LICENSE 檔為準。
 
 ## 輸出保護與回歸測試
 
@@ -132,3 +138,9 @@ macOS 安裝 Swift、Python 3、ffmpeg 與 ffprobe 後,執行 `python3 Tests/reg
 左側是轉檔佇列，右側持續顯示輸出設定，底部固定開始／停止操作。加入影片後先確認清單與儲存位置，再按「開始轉檔」；可自行開啟立即轉換。進階選項預設收起，「移除已完成」會保留失敗項目供重試。右側語言選單支援跟隨系統、繁體中文與英文；部分既有工作訊息需重新開啟 App 後完整套用新語言。
 
 macOS 26 以上的加入控制列與底部操作列使用原生 Liquid Glass，舊系統使用標準系統材質。檔案內容維持清楚易讀，並支援系統的降低透明度與減少動態效果設定。App icon 採用簡單的藍色雙向箭頭。
+
+## DMG 下載與建置
+
+Apple Silicon 版本請至 [GitHub Release v1](https://github.com/jimmyLC/MacMP4/releases/tag/v1) 下載，需 macOS 13 以上並另行安裝 ffmpeg/ffprobe。此版使用 ad-hoc 簽章，尚無 Developer ID 簽章與 Apple 公證。
+
+從原始碼建置需使用包含 macOS 26 SDK 或更新 SDK 的 Xcode，執行 `./build-dmg.sh`。安裝包包含 MacMP4.app、Applications 捷徑、LICENSE 與中英安裝說明；腳本會驗證映像並產生 build/SHA256SUMS.txt。App 顯示版本以 VERSION 為準。
