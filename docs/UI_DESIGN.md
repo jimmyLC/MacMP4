@@ -71,3 +71,11 @@ Production starts Free. AppAccess is an injectable entitlement boundary, not a p
 - Isolated compile-time Pro preview: badge visible, Light/Dark/System each selected successfully, Dark sheet visually inspected. No user system appearance setting changed.
 - Preferences tested in isolated UserDefaults domains: persistence, invalid-value fallback, Free rejection of dark/system, entitlement revocation/restoration, and no unlock through unrelated isPro/tier defaults.
 - Payment, serial/email validation and automatic paid activation are not implemented in this change. Existing v1 release and installed application are unchanged.
+
+## Force H.264 and Super Thanks
+
+Force H.264 is an opt-in Advanced option, off on every fresh JobStore. It skips stream-copy paths, takes precedence over the normal fallback re-encode toggle, and validates H.264/AAC before committing output. CPU and VideoToolbox fallback order and all existing output-protection/skip rules remain unchanged. Conversion is available to Free and Pro. Per owner request, the UI does not add a quality-loss warning; output format and original-file preservation are stated directly.
+
+The support entry is named 超級感謝 / Super Thanks. Its native heart silhouette has a dollar-sign cutout, matching the supplied reference direction and adapting to either appearance. A compact inspector entry opens a Pro summary with the agreed NT$90 lifetime price and honest coming-soon payment status. No checkout or fake activation is added.
+
+Verification: arm64 GUI/CLI build and all regressions passed (171 English keys). Synthetic HEVC/AAC input remains HEVC by default; forced CPU and automatic hardware/fallback output both probe as H.264/AAC. The actual GUI model was tested with Force H.264 enabled and normal re-encoding disabled. Native UI inspection confirmed the checkbox starts off, enables the H.264/AAC labels, disables the redundant fallback checkbox, and returns to default when turned off. The Super Thanks entry and heart/dollar cutout were visually inspected in the running Traditional Chinese Free preview. No public release, website deployment or installed-app replacement was performed for this change.

@@ -148,3 +148,7 @@ Apple Silicon 版本請至 [GitHub Release v1](https://github.com/jimmyLC/MacMP4
 MacMP4 開啟時會檢查 FFmpeg 與 ffprobe。缺少工具時會顯示設定引導；已安裝 Homebrew 可直接按「安裝 FFmpeg」，查看安裝訊息，失敗時可重試。沒有 Homebrew 則提供官方安裝說明。返回 App 後自動重新檢查，不必重開。Homebrew 目前正式支援 macOS 15 以上，較舊系統需自行安裝相容工具。
 
 Free 顯示 Free 標誌並固定使用淺色外觀。Pro 顯示 Pro 標誌，可選擇淺色、深色與跟隨系統，並記住外觀偏好。Free 保留完整轉檔功能。Pro 規劃為 NT$90 終身買斷；付款及 Email／序號啟用尚未串接，目前正式建置預設為 Free。開發預覽可用 `-D MACMP4_PREVIEW_PRO` 編譯，build.sh 不會啟用此旗標。
+
+進階選項新增「強制 H.264」，預設關閉，Free／Pro 均可使用。開啟後略過直接封裝策略，輸出 H.264 影片與 AAC 音訊（來源有音訊時），支援 VideoToolbox 與 CPU 備援；此選項優先於一般的重新編碼備援設定。CLI 使用 `--force-h264`，不可與 `--no-reencode` 並用。既有 MP4／M4V 與不覆蓋檔案的略過規則維持不變。
+
+支持入口統一使用「超級感謝」，搭配愛心內含 $ 的圖示。面板介紹 NT$90 終身買斷的 Pro 版本；目前尚未提供付款。

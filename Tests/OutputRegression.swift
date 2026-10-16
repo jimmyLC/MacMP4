@@ -3,6 +3,21 @@ import Foundation
 @main
 struct OutputRegression {
     static func main() throws {
+        let hevc = ProbeResult(videoCodec: "hevc", audioCodec: "aac", duration: 1)
+        let normal = FF.strategies(for: hevc, allowReencode: true, hardwareAccel: true)
+        precondition(normal.first?.args.contains("copy") == true, "default remux changed")
+        for hardware in [false, true] {
+            let forced = FF.strategies(for: hevc, allowReencode: false, hardwareAccel: hardware, forceH264: true)
+            precondition(!forced.isEmpty && forced.allSatisfy { !$0.args.contains("copy") })
+            precondition(forced.last?.args.contains("libx264") == true)
+            precondition(!hardware || forced.first?.args.contains("h264_videotoolbox") == true)
+        }
+        precondition(!FF.outputIsValid(hevc, forceH264: true))
+        precondition(FF.outputIsValid(hevc, forceH264: false))
+        precondition(FF.outputIsValid(ProbeResult(videoCodec: "h264", audioCodec: "aac", duration: 1), forceH264: true))
+        precondition(FF.outputIsValid(ProbeResult(videoCodec: "h264", audioCodec: nil, duration: 1), forceH264: true))
+        precondition(!FF.outputIsValid(ProbeResult(videoCodec: "h264", audioCodec: "ac3", duration: 1), forceH264: true))
+        precondition(FF.strategies(for: ProbeResult(audioCodec: "aac", duration: 1), allowReencode: true, hardwareAccel: false, forceH264: true).isEmpty)
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("macmp4-output-\(UUID())")
         try fm.createDirectory(at: root, withIntermediateDirectories: false)

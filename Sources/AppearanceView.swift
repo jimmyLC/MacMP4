@@ -20,6 +20,22 @@ extension AppAccess {
     }
 }
 
+struct SuperThanksIcon: View {
+    var body: some View {
+        Image(systemName: "heart.fill")
+            .resizable().scaledToFit()
+            .overlay {
+                Text("$")
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .blendMode(.destinationOut)
+                    .offset(y: -1)
+            }
+            .compositingGroup()
+            .frame(width: 24, height: 23)
+            .accessibilityHidden(true)
+    }
+}
+
 struct PlanBadge: View {
     let tier: AppTier
     var body: some View {
@@ -82,6 +98,11 @@ struct AppearanceView: View {
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.10), lineWidth: 1))
             if !access.isPro {
                 VStack(alignment: .leading, spacing: 6) {
+                    Label {
+                        Text(L("超級感謝"))
+                    } icon: {
+                        SuperThanksIcon()
+                    }.font(.callout.weight(.semibold))
                     Text(L("Pro · NT$90 終身買斷")).font(.callout.weight(.semibold))
                     Text(L("包含 Pro 標誌、深色外觀與跟隨系統自動切換。Pro 升級即將開放。"))
                         .font(.caption).foregroundStyle(.secondary)
@@ -94,7 +115,7 @@ struct AppearanceView: View {
             }
         }
         .padding(28).frame(width: 440)
-        .alert(L("Pro 外觀功能"), isPresented: $showingProInfo) {
+        .alert(L("超級感謝"), isPresented: $showingProInfo) {
             Button(L("知道了"), role: .cancel) {}
         } message: {
             Text(L("深色與跟隨系統是 Pro 功能。Pro 為 NT$90 終身買斷，升級即將開放；轉檔功能維持免費。"))
@@ -130,5 +151,40 @@ struct AppearanceView: View {
         .accessibilityLabel(appearance.title)
         .accessibilityValue(locked ? L("Pro 功能，尚未解鎖") : selected ? L("已選取") : L("未選取"))
         .help(locked ? L("Pro 可使用此功能") : appearance.subtitle)
+    }
+}
+
+struct SuperThanksView: View {
+    @EnvironmentObject private var access: AppAccess
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Label {
+                Text(L("超級感謝"))
+            } icon: {
+                SuperThanksIcon()
+            }.font(.title2.weight(.semibold))
+            Text(L("支持 MacMP4 的後續開發。"))
+                .font(.callout).foregroundStyle(.secondary)
+            HStack {
+                Text("MacMP4").font(.headline)
+                PlanBadge(tier: .pro)
+                Spacer()
+                Text(L("NT$90 終身買斷")).font(.headline)
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                Label(L("專屬 Pro 標誌"), systemImage: "checkmark")
+                Label(L("淺色、深色與跟隨系統外觀"), systemImage: "checkmark")
+                Label(L("完整轉檔功能維持免費"), systemImage: "checkmark")
+            }.font(.callout)
+            Text(access.isPro ? L("感謝你的支持，你目前使用 Pro 版本。") : L("Pro 升級即將開放，目前尚未提供付款。"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button(L("關閉")) { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+        }.padding(28).frame(width: 440)
     }
 }
