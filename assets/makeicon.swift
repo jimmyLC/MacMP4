@@ -1,111 +1,68 @@
-// makeicon.swift — 產生 1024x1024 App 圖示 PNG(Apple Big Sur 風格)
-// 用法: swift makeicon.swift <輸出.png>
+// Deterministic vector rendering of the user's thin-line exchange-arrow direction.
+// Usage: swift assets/makeicon.swift output.png [size]
 import AppKit
 
-let outPath = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "icon.png"
-let S: CGFloat = 1024
-let M: CGFloat = 100          // 邊距 → 內容 824x824(macOS 標準網格)
-let R: CGFloat = 185          // 圓角(≈ macOS 標準 squircle)
-
-guard let rep = NSBitmapImageRep(
-    bitmapDataPlanes: nil, pixelsWide: Int(S), pixelsHigh: Int(S),
+let output = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "icon.png"
+let pixels = CommandLine.arguments.count > 2 ? Int(CommandLine.arguments[2]) ?? 1024 : 1024
+guard pixels > 0, pixels <= 4096 else { fatalError("Icon size must be 1...4096") }
+guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
     bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-    colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-) else { exit(1) }
-
+    colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+      let context = NSGraphicsContext(bitmapImageRep: bitmap) else { fatalError("Cannot create icon") }
+func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
+    NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255,
+            blue: CGFloat(hex & 255) / 255, alpha: alpha)
+}
+func gradient(_ path: NSBezierPath, _ colors: [NSColor], angle: CGFloat = -90) {
+    NSGradient(colors: colors)!.draw(in: path, angle: angle)
+}
+func withShadow(blur: CGFloat, offset: CGFloat, alpha: CGFloat, draw: () -> Void) {
+    NSGraphicsContext.saveGraphicsState()
+    let shadow = NSShadow()
+    shadow.shadowColor = NSColor.black.withAlphaComponent(alpha)
+    shadow.shadowBlurRadius = blur
+    shadow.shadowOffset = NSSize(width: 0, height: offset)
+    shadow.set(); draw()
+    NSGraphicsContext.restoreGraphicsState()
+}
+func bezier(_ cgPath: CGPath) -> NSBezierPath {
+    let path = NSBezierPath()
+    cgPath.applyWithBlock { item in
+        let e = item.pointee
+        switch e.type {
+        case .moveToPoint: path.move(to: e.points[0])
+        case .addLineToPoint: path.line(to: e.points[0])
+        case .addCurveToPoint: path.curve(to: e.points[2], controlPoint1: e.points[0], controlPoint2: e.points[1])
+        case .closeSubpath: path.close()
+        default: break
+        }
+    }
+    return path
+}
 NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-
-// MARK: 背景 — 中性灰漸層 squircle
-
-let rect = NSRect(x: M, y: M, width: S - M * 2, height: S - M * 2)
-let squircle = NSBezierPath(roundedRect: rect, xRadius: R, yRadius: R)
-
-let bg = NSGradient(colors: [
-    NSColor(calibratedRed: 0.965, green: 0.965, blue: 0.973, alpha: 1),  // #F6F6F8 左上
-    NSColor(calibratedRed: 0.812, green: 0.812, blue: 0.835, alpha: 1),  // #CFCFD5 右下
-])!
-bg.draw(in: squircle, angle: -50)
-
-// 底部內陰影,增加立體感
-if let shade = NSGradient(colorsAndLocations:
-    (NSColor.black.withAlphaComponent(0.0), 0.30),
-    (NSColor.black.withAlphaComponent(0.06), 1.0)
-) {
-    NSGraphicsContext.saveGraphicsState()
-    squircle.addClip()
-    shade.draw(in: rect, angle: -90)
-    NSGraphicsContext.restoreGraphicsState()
+NSGraphicsContext.current = context
+context.cgContext.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
+let tile = NSBezierPath(roundedRect: NSRect(x: 100, y: 100, width: 824, height: 824), xRadius: 184, yRadius: 184)
+withShadow(blur: 16, offset: -9, alpha: 0.13) {
+    gradient(tile, [color(0xFCFEFF), color(0xEDF5FC), color(0xDCE9F7)], angle: -65)
 }
+color(0xFFFFFF, 0.95).setStroke(); tile.lineWidth = 3; tile.stroke()
+let inset = NSBezierPath(roundedRect: NSRect(x: 107, y: 107, width: 810, height: 810), xRadius: 177, yRadius: 177)
+color(0x92B8D8, 0.16).setStroke(); inset.lineWidth = 1.5; inset.stroke()
 
-// 上緣內高光(整面漸層自然淡出,避免接縫)
-if let sheen = NSGradient(colorsAndLocations:
-    (NSColor.white.withAlphaComponent(0.55), 0.0),
-    (NSColor.white.withAlphaComponent(0.10), 0.38),
-    (NSColor.white.withAlphaComponent(0.0), 0.75)
-) {
-    NSGraphicsContext.saveGraphicsState()
-    squircle.addClip()
-    sheen.draw(in: rect, angle: -90)
-    NSGraphicsContext.restoreGraphicsState()
+// The arrows share the same line weight, 45-degree heads and rounded ends.
+// Upper points left; lower points right, matching the supplied reference.
+let strokes = CGMutablePath()
+strokes.move(to: CGPoint(x: 720, y: 614)); strokes.addLine(to: CGPoint(x: 304, y: 614))
+strokes.move(to: CGPoint(x: 390, y: 700)); strokes.addLine(to: CGPoint(x: 304, y: 614)); strokes.addLine(to: CGPoint(x: 390, y: 528))
+strokes.move(to: CGPoint(x: 304, y: 410)); strokes.addLine(to: CGPoint(x: 720, y: 410))
+strokes.move(to: CGPoint(x: 634, y: 496)); strokes.addLine(to: CGPoint(x: 720, y: 410)); strokes.addLine(to: CGPoint(x: 634, y: 324))
+let lineWidth: CGFloat = pixels <= 32 ? 50 : 44
+let mark = bezier(strokes.copy(strokingWithWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 1))
+withShadow(blur: 7, offset: -4, alpha: 0.12) {
+    gradient(mark, [color(0x24B5FF), color(0x098AF6), color(0x086BE9)])
 }
-
-// 極細外框,讓邊界更俐落
-NSColor.black.withAlphaComponent(0.08).setStroke()
-squircle.lineWidth = 2
-squircle.stroke()
-
-// MARK: 播放鍵 — 石墨色圓角三角
-
-let cx = S / 2
-let cy = S * 0.615
-let p1 = CGPoint(x: cx - 172, y: cy + 183)
-let p2 = CGPoint(x: cx + 212, y: cy)
-let p3 = CGPoint(x: cx - 172, y: cy - 183)
-
-func mid(_ a: CGPoint, _ b: CGPoint) -> CGPoint {
-    CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
-}
-
-let cg = CGMutablePath()
-cg.move(to: mid(p1, p2))
-cg.addArc(tangent1End: p2, tangent2End: p3, radius: 36)
-cg.addArc(tangent1End: p3, tangent2End: p1, radius: 36)
-cg.addArc(tangent1End: p1, tangent2End: p2, radius: 36)
-cg.closeSubpath()
-let tri = NSBezierPath(cgPath: cg)
-
-let shadow = NSShadow()
-shadow.shadowBlurRadius = 30
-shadow.shadowOffset = NSSize(width: 0, height: -14)
-shadow.shadowColor = NSColor.black.withAlphaComponent(0.30)
-shadow.set()
-
-let fg = NSGradient(colors: [
-    NSColor(calibratedRed: 0.255, green: 0.255, blue: 0.290, alpha: 1),  // #41414A 上
-    NSColor(calibratedRed: 0.125, green: 0.125, blue: 0.145, alpha: 1),  // #202025 下
-])!
-fg.draw(in: tri, angle: 90)
-
-// MARK: MP4 — SF Rounded 字型
-
-// 清除三角形留下的陰影狀態,文字保持俐落
-NSGraphicsContext.current?.cgContext.setShadow(offset: .zero, blur: 0, color: nil)
-
-var font = NSFont.systemFont(ofSize: 152, weight: .heavy)
-if let desc = font.fontDescriptor.withDesign(.rounded),
-   let rounded = NSFont(descriptor: desc, size: 152) {
-    font = rounded
-}
-let attrs: [NSAttributedString.Key: Any] = [
-    .font: font,
-    .foregroundColor: NSColor(calibratedRed: 0.16, green: 0.16, blue: 0.18, alpha: 1),  // #29292E
-]
-let text = "MP4" as NSString
-let ts = text.size(withAttributes: attrs)
-text.draw(at: NSPoint(x: (S - ts.width) / 2, y: S * 0.145), withAttributes: attrs)
-
 NSGraphicsContext.restoreGraphicsState()
-
-guard let png = rep.representation(using: .png, properties: [:]) else { exit(1) }
-try? png.write(to: URL(fileURLWithPath: outPath))
+guard let png = bitmap.representation(using: .png, properties: [:]) else { fatalError("Cannot encode PNG") }
+do { try png.write(to: URL(fileURLWithPath: output)) }
+catch { fputs("Cannot write icon: \(error)\n", stderr); exit(1) }

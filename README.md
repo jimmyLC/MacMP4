@@ -120,3 +120,9 @@ build.sh                build script
 ## License
 
 [MIT](LICENSE)
+
+## Output safety and regression checks
+
+Conversions are staged beside the destination and validated before the final MP4 is atomically replaced. Failed or cancelled attempts preserve existing output files. Directory and symbolic-link destinations are rejected. Valid sub-second clips are supported.
+
+Run `python3 Tests/regressions.py` on macOS with Swift, Python 3, ffmpeg and ffprobe installed. The suite uses disposable synthetic media and covers CLI conversion, GUI queue-model cancellation, output preservation and noisy probing.

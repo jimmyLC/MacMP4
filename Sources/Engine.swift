@@ -1,5 +1,6 @@
 // Engine.swift — ffmpeg/ffprobe 操作核心(無 UI 依賴,可同時給 GUI 和 CLI 用)
 import Foundation
+import Darwin
 
 struct ProbeResult {
     var videoCodec: String?
@@ -7,6 +8,10 @@ struct ProbeResult {
     var duration: Double?
     var hasVideo: Bool { videoCodec != nil }
     var hasAudio: Bool { audioCodec != nil }
+    var isValidOutput: Bool {
+        guard hasVideo || hasAudio, let duration else { return false }
+        return duration.isFinite && duration > 0
+    }
 }
 
 struct Strategy {
@@ -34,14 +39,17 @@ enum FF {
     }
 
     /// 用 ffprobe 讀取第一個視訊/音訊編碼與時長
-    static func probe(url: URL, ffprobe: String) -> ProbeResult? {
+    static func probe(url: URL, ffprobe: String, didStart: ((Process) -> Void)? = nil) -> ProbeResult? {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: ffprobe)
         p.arguments = ["-v", "error", "-print_format", "json", "-show_streams", "-show_format", url.path]
         let out = Pipe()
         p.standardOutput = out
-        p.standardError = Pipe()
+        // Probe diagnostics are not displayed. A null handle cannot fill up and
+        // block the child while the parent waits for JSON on stdout.
+        p.standardError = FileHandle.nullDevice
         do { try p.run() } catch { return nil }
+        didStart?(p)
         let data = out.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
         guard p.terminationStatus == 0,
@@ -167,6 +175,59 @@ enum FF {
         _ = errPipe.fileHandleForReading.readDataToEndOfFile()
         return p.terminationStatus == 0
     }
+}
+
+/// Each conversion owns a private staging directory beside its destination.
+/// Only this directory is cleaned up; the final path is touched after validation.
+final class OutputTransaction {
+    let temporaryURL: URL
+    private let directory: URL
+    private let destination: URL
+    private let overwrite: Bool
+
+    init(destination: URL, overwrite: Bool) throws {
+        self.destination = destination
+        self.overwrite = overwrite
+        try Self.validateDestination(destination, overwrite: overwrite)
+        directory = destination.deletingLastPathComponent()
+            .appendingPathComponent(".macmp4-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        temporaryURL = directory.appendingPathComponent("output.mp4")
+    }
+
+    private static func validateDestination(_ url: URL, overwrite: Bool) throws {
+        // attributesOfItem inspects the link itself: reject directories, symlinks
+        // (including dangling ones), devices, etc., rather than following them.
+        let attributes: [FileAttributeKey: Any]
+        do { attributes = try FileManager.default.attributesOfItem(atPath: url.path) }
+        catch let error as NSError {
+            if error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError { return }
+            throw error
+        }
+        guard overwrite, attributes[.type] as? FileAttributeType == .typeRegular else {
+            throw NSError(domain: "MacMP4.Output", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "輸出位置已存在或不是一般檔案: \(url.lastPathComponent)"])
+        }
+    }
+
+    func commit() throws {
+        try Self.validateDestination(destination, overwrite: overwrite)
+        // Both paths are on the same volume. rename atomically replaces a file
+        // without truncating it first; RENAME_EXCL prevents no-overwrite races
+        // without requiring hard-link support on the output filesystem.
+        let result = temporaryURL.withUnsafeFileSystemRepresentation { source in
+            destination.withUnsafeFileSystemRepresentation { target in
+                overwrite ? Darwin.rename(source!, target!) : Darwin.renamex_np(source!, target!, UInt32(RENAME_EXCL))
+            }
+        }
+        guard result == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+    }
+
+    func discardAttempt() {
+        try? FileManager.default.removeItem(at: temporaryURL)
+    }
+
+    deinit { try? FileManager.default.removeItem(at: directory) }
 }
 
 /// 秒數 → "H:MM:SS" / "M:SS"
