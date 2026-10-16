@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Run with python3 Tests/regressions.py; uses disposable synthetic media only."""
 import os
+import json
+import plistlib
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -75,6 +78,31 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
         print(result.stdout.strip(), flush=True)
     check('transaction regression suite', lambda: swift_regression('output-tests', [ROOT/'Tests/OutputRegression.swift'], []))
     check('GUI model regression suite', lambda: swift_regression('model-tests', [ROOT/'Sources/Model.swift', ROOT/'Tests/ModelRegression.swift'], [short, FFMPEG, FFPROBE]))
+    def localization():
+        expected = json.loads(run(['plutil', '-convert', 'json', '-o', '-', ROOT/'Resources/en.lproj/Localizable.strings']).stdout)
+        keys = set()
+        for source in (ROOT/'Sources').glob('*.swift'):
+            keys.update(re.findall(r'L\("([^"\n]*)"\)', source.read_text()))
+        require(not keys-expected.keys(), f'Missing English translations: {keys-expected.keys()}')
+        for key, translation in expected.items():
+            tokens = r'%(?:\.\d+)?[d@f%]'
+            require(re.findall(tokens, key) == re.findall(tokens, translation), f'Format mismatch: {key}')
+        app = tmp/'LocalizationTests.app/Contents'
+        resources = app/'Resources'
+        binary = app/'MacOS/localization-tests'
+        binary.parent.mkdir(parents=True)
+        resources.mkdir()
+        for language in ['en', 'zh-Hant']:
+            shutil.copytree(ROOT/f'Resources/{language}.lproj', resources/f'{language}.lproj')
+        (resources/'Expected.json').write_text(json.dumps(expected))
+        (app/'Info.plist').write_bytes(plistlib.dumps({'CFBundleExecutable': binary.name, 'CFBundleIdentifier': 'local.macmp4.LocalizationRegression', 'CFBundleDevelopmentRegion': 'en'}))
+        compiled = run(['swiftc', '-swift-version', '5', '-parse-as-library', ROOT/'Sources/Engine.swift', ROOT/'Tests/LocalizationRegression.swift', '-o', binary])
+        require(compiled.returncode == 0, compiled.stderr)
+        result = run([binary])
+        require(result.returncode == 0, result.stdout + result.stderr)
+        print(result.stdout.strip(), flush=True)
+    check('localization resources and runtime lookup', localization)
+
 
 
 if failures:
