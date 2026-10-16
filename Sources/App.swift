@@ -27,6 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         DispatchQueue.main.async { JobStore.shared.add(urls: urls) }
     }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        ToolInstaller.shared.deferTerminationIfInstalling() ? .terminateLater : .terminateNow
+    }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 
@@ -86,6 +89,7 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dropTargeted = false
     @State private var advancedExpanded = false
+    @State private var showingToolSetup = false
 
     private var toolsAvailable: Bool { store.ffmpeg != nil && store.ffprobe != nil }
     private var outputName: String {
@@ -107,6 +111,14 @@ struct ContentView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .tint(.blue)
         .sheet(isPresented: $showingAbout) { AboutView() }
+        .sheet(isPresented: $showingToolSetup) { ToolSetupView().environmentObject(store) }
+        .onAppear {
+            store.refreshTools()
+            showingToolSetup = !toolsAvailable
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            store.refreshTools()
+        }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted, perform: handleDrop)
         .overlay {
             if dropTargeted {
@@ -149,14 +161,11 @@ struct ContentView: View {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 5) {
                 Text(L("需要先安裝轉檔工具")).fontWeight(.medium)
-                Text(L("在終端機執行 brew install ffmpeg，完成後重新開啟 MacMP4。"))
+                Text(L("缺少 FFmpeg 或 ffprobe，安裝完成後即可開始轉檔。"))
                     .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             }
             Spacer()
-            Button(L("複製指令")) {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString("brew install ffmpeg", forType: .string)
-            }
+            Button(L("安裝與檢查")) { showingToolSetup = true }
         }
         .padding(14).background(Color.orange.opacity(0.08))
     }

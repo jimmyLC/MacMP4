@@ -145,3 +145,5 @@ On macOS 26+, the import control and action shelf use native Liquid Glass. Earli
 Download the Apple Silicon build from [GitHub Release v1](https://github.com/jimmyLC/MacMP4/releases/tag/v1). It requires macOS 13+ and separately installed ffmpeg/ffprobe. This release is ad-hoc signed, without Developer ID signing or Apple notarization.
 
 To build from source, use Xcode with the macOS 26 SDK or later, then run `./build-dmg.sh`. The package contains MacMP4.app, an Applications shortcut, LICENSE and bilingual installation instructions. The script verifies the disk image and writes build/SHA256SUMS.txt. The app's display version comes from VERSION.
+
+On launch, MacMP4 checks for both FFmpeg and ffprobe. If either is missing, setup offers **Install FFmpeg** through an existing Homebrew installation, with live output and retry on failure. Without Homebrew, setup links to its official instructions. Returning to the app rechecks the tools without restarting. Homebrew currently supports macOS 15+; on older macOS versions, install compatible tools separately.

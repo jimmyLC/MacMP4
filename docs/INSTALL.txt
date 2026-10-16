@@ -4,7 +4,9 @@ https://jimmy-tools.com/MacMP4/
 繁體中文
 1. 將 MacMP4.app 拖入 Applications（應用程式）。
 2. 需要 Apple Silicon（M 系列）Mac 與 macOS 13 或以上。
-3. 需另外安裝 ffmpeg / ffprobe。已安裝 Homebrew 的使用者可在終端機執行：
+3. 首次開啟會檢查 ffmpeg / ffprobe。已有 Homebrew 可在 App 中按「安裝 FFmpeg」。
+   沒有 Homebrew 時提供官方安裝入口；Homebrew 目前正式支援 macOS 15 以上。
+   也可自行安裝相容工具，返回 App 後自動重新檢查。手動指令：
    brew install ffmpeg
 4. 這個版本尚未以 Apple Developer ID 簽署或經 Apple 公證。
    若 macOS 阻擋開啟，可先確認下載來源為 JimmyLC 的官方 GitHub Release，
@@ -18,7 +20,10 @@ Copyright © 2026 JimmyLC
 English
 1. Drag MacMP4.app to Applications.
 2. Requires an Apple Silicon Mac and macOS 13 or later.
-3. Install ffmpeg / ffprobe separately. With Homebrew installed, run:
+3. First launch checks ffmpeg / ffprobe. With Homebrew, click Install FFmpeg in the app.
+   Without Homebrew, setup links to its official website (currently supports macOS 15+).
+   You can also install compatible tools separately. Returning to the app rechecks them.
+   Manual command:
    brew install ffmpeg
 4. This release is ad-hoc signed, without Developer ID signing or Apple notarization.
    macOS may block opening it. Verify the official JimmyLC GitHub Release source,

@@ -78,6 +78,7 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
         print(result.stdout.strip(), flush=True)
     check('transaction regression suite', lambda: swift_regression('output-tests', [ROOT/'Tests/OutputRegression.swift'], []))
     check('GUI model regression suite', lambda: swift_regression('model-tests', [ROOT/'Sources/Model.swift', ROOT/'Tests/ModelRegression.swift'], [short, FFMPEG, FFPROBE]))
+    check('tool installer regression suite', lambda: swift_regression('tool-setup-tests', [ROOT/'Sources/Model.swift', ROOT/'Sources/ToolSetup.swift', ROOT/'Tests/ToolSetupRegression.swift'], []))
     def localization():
         expected = json.loads(run(['plutil', '-convert', 'json', '-o', '-', ROOT/'Resources/en.lproj/Localizable.strings']).stdout)
         keys = set()

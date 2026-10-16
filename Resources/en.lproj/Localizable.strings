@@ -149,3 +149,37 @@
 "可研究、修改與分享，須保留版權及授權聲明。商業用途須另行取得書面授權。" = "You may study, modify and share this software, retaining its copyright and license notices. Commercial use requires separate written permission.";
 "完整授權條款" = "Full license terms";
 "關閉" = "Close";
+
+"缺少 FFmpeg 或 ffprobe，安裝完成後即可開始轉檔。" = "FFmpeg or ffprobe is missing. Install the tools to start converting.";
+
+"安裝與檢查" = "Install & Check";
+
+"轉檔工具已就緒" = "Conversion Tools Ready";
+
+"準備轉檔工具" = "Set Up Conversion Tools";
+
+"MacMP4 需要 FFmpeg 與 ffprobe。每次開啟與返回 App 時會自動檢查，安裝完成後不用重新啟動。" = "MacMP4 needs FFmpeg and ffprobe. Tools are checked when you open or return to the app. No restart is needed after installation.";
+
+"按下安裝後，會透過這台 Mac 的 Homebrew 執行以下指令，並下載所需套件。" = "Click Install to run the following command using Homebrew on this Mac and download the required packages.";
+
+"安裝中…" = "Installing…";
+
+"安裝 FFmpeg" = "Install FFmpeg";
+
+"尚未找到 Homebrew。請先依官網指示安裝，完成後返回這裡重新檢查。" = "Homebrew was not found. Follow the instructions on its official website, then return here and check again.";
+
+"開啟 Homebrew 官網" = "Open Homebrew Website";
+
+"Homebrew 目前正式支援 macOS 15 以上；較舊系統可自行安裝相容的 FFmpeg 與 ffprobe。" = "Homebrew currently supports macOS 15 and later. On older systems, install compatible FFmpeg and ffprobe tools separately.";
+
+"尚未完成安裝，請查看下方訊息。修正後可以重試，或自行安裝再重新檢查。" = "Installation is not complete. Review the output below, resolve the issue and retry, or install the tools separately and check again.";
+
+"重新檢查" = "Check Again";
+
+"完成" = "Done";
+
+"稍後設定" = "Set Up Later";
+
+"FFmpeg 正在安裝，完成後會結束 MacMP4。" = "FFmpeg is installing. MacMP4 will quit when installation finishes.";
+
+"在背景安裝" = "Continue in Background";

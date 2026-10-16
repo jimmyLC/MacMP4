@@ -25,6 +25,16 @@ struct ModelRegression {
             store.hardwareAccel = false
             return store
         }
+        let setup = JobStore(ffmpeg: nil, ffprobe: nil)
+        precondition(setup.ffmpeg == nil && setup.ffprobe == nil)
+        setup.refreshTools { $0 == "ffmpeg" ? ffmpeg : ffprobe }
+        precondition(setup.ffmpeg == ffmpeg && setup.ffprobe == ffprobe, "setup did not detect installed tools")
+        setup.isRunning = true
+        setup.refreshTools { _ in nil }
+        precondition(setup.ffmpeg == ffmpeg && setup.ffprobe == ffprobe, "setup changed tools during conversion")
+        setup.isRunning = false
+        setup.refreshTools { _ in nil }
+        precondition(setup.ffmpeg == nil && setup.ffprobe == nil, "removed tool was not detected")
         let input = root.appendingPathComponent("clip.ts")
         let output = root.appendingPathComponent("clip.mp4")
         try fm.copyItem(at: source, to: input)

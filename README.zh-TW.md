@@ -144,3 +144,5 @@ macOS 26 以上的加入控制列與底部操作列使用原生 Liquid Glass，�
 Apple Silicon 版本請至 [GitHub Release v1](https://github.com/jimmyLC/MacMP4/releases/tag/v1) 下載，需 macOS 13 以上並另行安裝 ffmpeg/ffprobe。此版使用 ad-hoc 簽章，尚無 Developer ID 簽章與 Apple 公證。
 
 從原始碼建置需使用包含 macOS 26 SDK 或更新 SDK 的 Xcode，執行 `./build-dmg.sh`。安裝包包含 MacMP4.app、Applications 捷徑、LICENSE 與中英安裝說明；腳本會驗證映像並產生 build/SHA256SUMS.txt。App 顯示版本以 VERSION 為準。
+
+MacMP4 開啟時會檢查 FFmpeg 與 ffprobe。缺少工具時會顯示設定引導；已安裝 Homebrew 可直接按「安裝 FFmpeg」，查看安裝訊息，失敗時可重試。沒有 Homebrew 則提供官方安裝說明。返回 App 後自動重新檢查，不必重開。Homebrew 目前正式支援 macOS 15 以上，較舊系統需自行安裝相容工具。
