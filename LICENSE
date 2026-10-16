@@ -1,21 +1,56 @@
-MIT License
+MacMP4 Noncommercial License 1.0
 
-Copyright (c) 2026 JimmyLC
+Copyright (c) 2026 JimmyLC. All rights reserved.
+Developer: JimmyLC
+Website: https://jimmy-tools.com/
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Permission for noncommercial use
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Subject to the conditions below, permission is granted, free of charge, to
+use, study, copy, modify, and redistribute this software and its associated
+source code, documentation, and original artwork (the "Software") solely
+for noncommercial purposes.
+
+2. Commercial use is prohibited
+
+No permission for commercial use is granted. Commercial use includes use
+primarily intended for or directed toward commercial advantage or monetary
+compensation, including business operations, professional or client work,
+paid conversion services, selling or licensing the Software, and including
+it in a commercial product or service. This restriction applies to both
+original and modified versions, whether or not the Software itself is sold.
+A separate written license from JimmyLC is required for any commercial use.
+Contact the developer through https://jimmy-tools.com/ for inquiries.
+
+3. Redistribution and attribution
+
+Every redistributed copy or substantial portion of the Software must retain
+this license, the copyright notice, the developer name, and the website.
+Modified versions must clearly state that they have been modified and must
+retain these same noncommercial restrictions. You may not remove these
+notices, offer broader rights than this license grants, or imply endorsement
+by the original developer.
+
+4. Scope and prior releases
+
+Source code is available for inspection and noncommercial modification.
+Because commercial use is restricted, this is a source-available license,
+not an Open Source Initiative-approved open-source license.
+
+This license applies to versions distributed with this license. Earlier
+versions distributed under the MIT License, and rights already granted
+under that license, are unaffected. This license does not replace the
+licenses of third-party components, including separately installed ffmpeg
+and ffprobe. It grants no rights to third-party trademarks or media. It
+neither claims ownership of input/output media nor relicenses that media;
+use of the Software itself remains subject to the restrictions above.
+
+5. Disclaimer
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE, TO THE EXTENT PERMITTED BY APPLICABLE LAW.

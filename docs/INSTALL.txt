@@ -1,0 +1,30 @@
+MacMP4 v1 — JimmyLC
+https://jimmy-tools.com/MacMP4/
+
+繁體中文
+1. 將 MacMP4.app 拖入 Applications（應用程式）。
+2. 需要 Apple Silicon（M 系列）Mac 與 macOS 13 或以上。
+3. 需另外安裝 ffmpeg / ffprobe。已安裝 Homebrew 的使用者可在終端機執行：
+   brew install ffmpeg
+4. 這個版本尚未以 Apple Developer ID 簽署或經 Apple 公證。
+   若 macOS 阻擋開啟，可先確認下載來源為 JimmyLC 的官方 GitHub Release，
+   再依 macOS「系統設定 → 隱私權與安全性」的提示個別允許開啟。
+   無須關閉 Gatekeeper 或系統安全功能。
+5. 匯入影片、確認輸出位置，再按「開始轉檔」。原始影片會保留。
+
+原始碼公開，非商業用途免費；禁止商用。完整條款見 LICENSE。
+Copyright © 2026 JimmyLC
+
+English
+1. Drag MacMP4.app to Applications.
+2. Requires an Apple Silicon Mac and macOS 13 or later.
+3. Install ffmpeg / ffprobe separately. With Homebrew installed, run:
+   brew install ffmpeg
+4. This release is ad-hoc signed, without Developer ID signing or Apple notarization.
+   macOS may block opening it. Verify the official JimmyLC GitHub Release source,
+   then follow the per-app prompt in System Settings > Privacy & Security.
+   Do not disable Gatekeeper or system security protections.
+5. Add videos, review the output location, and start conversion. Originals are kept.
+
+Source available, free for noncommercial use. Commercial use is prohibited.
+See LICENSE for the full terms. Third-party tools retain their own licenses.

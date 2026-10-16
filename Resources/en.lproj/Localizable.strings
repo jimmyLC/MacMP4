@@ -140,3 +140,12 @@
 "必要時重新編碼影片" = "Re-encode video when needed";
 "影片重新編碼可能改變畫質；音訊修復仍會自動嘗試。" = "Video re-encoding may affect quality. Audio repair is still attempted automatically.";
 "影片編碼 %@ 無法直接封裝成 MP4，請開啟「必要時重新編碼影片」。" = "Video codec %@ cannot be remuxed to MP4. Enable “Re-encode video when needed”.";
+
+/* Developer attribution and noncommercial license */
+"關於 MacMP4" = "About MacMP4";
+"關於與授權" = "About & license";
+"開發者：JimmyLC" = "Developer: JimmyLC";
+"原始碼公開，非商業用途免費。禁止商業用途。" = "Source available. Free for noncommercial use. Commercial use prohibited.";
+"可研究、修改與分享，須保留版權及授權聲明。商業用途須另行取得書面授權。" = "You may study, modify and share this software, retaining its copyright and license notices. Commercial use requires separate written permission.";
+"完整授權條款" = "Full license terms";
+"關閉" = "Close";

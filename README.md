@@ -5,7 +5,7 @@
 Drop in `.ts` files (or `mkv` / `m2ts` / `flv` / `avi` / `mov` / …) and get `.mp4` back — no re-encoding, no quality loss, usually hundreds of times faster than realtime. Includes automatic repair for damaged recordings.
 
 [![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue)](#requirements)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License](https://img.shields.io/badge/license-Noncommercial-blue)](LICENSE)
 [![Powered by](https://img.shields.io/badge/powered%20by-ffmpeg-orange)](https://ffmpeg.org)
 
 [繁體中文說明 →](README.zh-TW.md)
@@ -120,7 +120,13 @@ build.sh                build script
 
 ## License
 
-[MIT](LICENSE)
+[MacMP4 Noncommercial License 1.0](LICENSE)
+
+Copyright © 2026 **JimmyLC** · [Developer website](https://jimmy-tools.com/)
+
+Source code is available. You may use, study, modify and redistribute MacMP4 for noncommercial purposes free of charge, retaining the copyright notice, developer attribution, website and license. **Commercial use is prohibited**, including business operations, professional/client work, paid services and commercial bundling, unless JimmyLC grants a separate written license.
+
+This is source-available software with a noncommercial restriction, rather than OSI-approved open-source software. Earlier MIT releases and rights already granted under MIT remain unaffected. Third-party tools retain their own licenses. The English LICENSE file contains the full terms.
 
 ## Output safety and regression checks
 
@@ -133,3 +139,9 @@ Run `python3 Tests/regressions.py` on macOS with Swift, Python 3, ffmpeg and ffp
 The queue sits beside a persistent output inspector, with Start/Stop in the bottom action shelf. Advanced options are collapsed initially. Clearing completed retains failed items for retry. The interface supports system default, Traditional Chinese and English through the inspector's Language menu. Some existing job messages may require reopening the app to fully adopt a language change.
 
 On macOS 26+, the import control and action shelf use native Liquid Glass. Earlier systems use standard system material. File rows stay readable, and system Reduce Transparency / Reduce Motion preferences are respected. The app icon uses a simple pair of opposing blue arrows.
+
+## Download and build a DMG
+
+Download the Apple Silicon build from [GitHub Release v1](https://github.com/jimmyLC/MacMP4/releases/tag/v1). It requires macOS 13+ and separately installed ffmpeg/ffprobe. This release is ad-hoc signed, without Developer ID signing or Apple notarization.
+
+To build from source, use Xcode with the macOS 26 SDK or later, then run `./build-dmg.sh`. The package contains MacMP4.app, an Applications shortcut, LICENSE and bilingual installation instructions. The script verifies the disk image and writes build/SHA256SUMS.txt. The app's display version comes from VERSION.

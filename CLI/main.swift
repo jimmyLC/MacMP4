@@ -15,6 +15,8 @@ func printUsage() {
       --no-gpu          重新編碼時不使用 GPU 硬體加速(改用 CPU)
       -h, --help        顯示說明
     """)
+    print("Copyright © 2026 JimmyLC · https://jimmy-tools.com/")
+    print(L("原始碼公開，非商業用途免費。禁止商業用途。"))
 }
 
 var inputs: [URL] = []
