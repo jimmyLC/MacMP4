@@ -318,16 +318,6 @@ struct ContentView: View {
             }
             .buttonStyle(.plain).font(.callout)
             .padding(.horizontal, 20).padding(.top, 14)
-            Button { showingThanks = true } label: {
-                Label {
-                    Text(L("超級感謝"))
-                } icon: {
-                    SuperThanksIcon()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain).font(.callout.weight(.medium)).foregroundStyle(.secondary)
-            .padding(.horizontal, 20).padding(.top, 12)
             Picker(L("語言"), selection: $store.appLanguage) {
                 Text(L("跟隨系統")).tag("system")
                 Text("繁體中文").tag("zh-Hant")
@@ -335,13 +325,40 @@ struct ContentView: View {
             }
             .pickerStyle(.menu).font(.callout)
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
-            HStack {
-                Text("© 2026 JimmyLC").foregroundStyle(.secondary)
-                Spacer()
-                Button(L("關於與授權")) { showingAbout = true }.buttonStyle(.link)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 2) {
+                    Text("© 2026 JimmyLC").foregroundStyle(.secondary).fixedSize()
+                    Spacer(minLength: 0)
+                    thanksButton
+                    Spacer(minLength: 0)
+                    aboutButton
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("© 2026 JimmyLC").foregroundStyle(.secondary)
+                    HStack {
+                        thanksButton
+                        Spacer()
+                        aboutButton
+                    }
+                }
             }
             .font(.caption).padding(.horizontal, 20).padding(.bottom, 16)
         }
+    }
+
+    private var thanksButton: some View {
+        Button { showingThanks = true } label: {
+            HStack(spacing: 4) {
+                SuperThanksIcon(size: 14)
+                Text(L("超級感謝")).fontWeight(.medium).fixedSize()
+            }.contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).foregroundStyle(.secondary)
+    }
+
+    private var aboutButton: some View {
+        Button(L("關於與授權")) { showingAbout = true }
+            .buttonStyle(.link).fixedSize()
     }
 
     private var actionShelf: some View {
