@@ -9,7 +9,7 @@ MacMP4 v1.0.0：原生 Mac 影片轉檔工具，優先無損封裝，支援批�
 ## 安裝
 
 1. 開啟 DMG，將 MacMP4 拖入 Applications（應用程式）。
-2. 另需安裝 ffmpeg / ffprobe；已安裝 Homebrew 時執行 `brew install ffmpeg`。
+2. 開啟時自動檢查 ffmpeg / ffprobe；已有 Homebrew 可在 App 內點選安裝並查看訊息，不必重開。未安裝 Homebrew 時提供官網入口，目前 Homebrew 正式支援 macOS 15 以上；較舊系統需自行安裝相容工具。
 3. 開啟 App，加入影片、確認儲存位置，再按「開始轉檔」。
 
 此版使用本機 ad-hoc 簽章，**尚未使用 Apple Developer ID 簽署或經 Apple 公證**。macOS 可能阻擋首次開啟；確認此官方 Release 來源後，依「系統設定 → 隱私權與安全性」的個別 App 提示處理。無須停用系統安全功能。

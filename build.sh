@@ -16,7 +16,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 echo "==> 編譯 GUI (${ARCH})"
 swiftc -O -swift-version 5 -parse-as-library -target "$TARGET" \
-    Sources/Engine.swift Sources/Model.swift Sources/App.swift \
+    Sources/Engine.swift Sources/Model.swift Sources/ToolSetup.swift Sources/App.swift \
     -o "$APP/Contents/MacOS/$APP_NAME"
 
 echo "==> 編譯 CLI"
@@ -60,7 +60,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key><string>local.jimmy.MacMP4</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>2</string>
+    <key>CFBundleVersion</key><string>3</string>
     <key>NSHumanReadableCopyright</key><string>Copyright © 2026 JimmyLC. Free for noncommercial use only.</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>

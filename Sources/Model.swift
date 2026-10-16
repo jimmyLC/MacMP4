@@ -30,8 +30,8 @@ final class Job: ObservableObject, Identifiable {
 final class JobStore: ObservableObject {
     static let shared = JobStore()
 
-    let ffmpeg: String?
-    let ffprobe: String?
+    @Published private(set) var ffmpeg: String?
+    @Published private(set) var ffprobe: String?
 
     @Published var jobs: [Job] = []
     @Published var isRunning = false
@@ -73,6 +73,13 @@ final class JobStore: ObservableObject {
     init(ffmpeg: String? = FF.findTool("ffmpeg"), ffprobe: String? = FF.findTool("ffprobe")) {
         self.ffmpeg = ffmpeg
         self.ffprobe = ffprobe
+    }
+
+    /// Recheck after setup or returning to the app; never change tools during a batch.
+    func refreshTools(find: (String) -> String? = FF.findTool) {
+        guard !isRunning else { return }
+        ffmpeg = find("ffmpeg")
+        ffprobe = find("ffprobe")
     }
 
     // MARK: - 對外操作(全部在主執行緒呼叫)
