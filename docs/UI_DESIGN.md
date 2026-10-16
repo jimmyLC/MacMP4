@@ -34,3 +34,20 @@ Use glass only for the action shelf and the compact import control. Keep file co
 ## Review before implementation
 
 A sidebar and dashboard metrics would add navigation to a one-job utility. Use one workspace and one narrow output inspector instead. A full-glass file list would reduce contrast; reserve the material for controls. The memorable feature is a quiet, tactile action shelf, not multiple decorated panels.
+
+## Upstream localization integration
+
+Merged origin/main at 570a200. Preserved upstream L(), AppLanguage persistence, system/zh-Hant/en choices, resource copying and development-region metadata. All new interface strings, dynamic format strings, tooltips, panel prompts and accessibility labels have English translations. Native language names remain in their own language. Runtime bundle tests cover both explicit languages and system fallback.
+
+## Verification
+
+- Built the native arm64 app with macOS 13 deployment target and macOS 26 availability guards.
+- Inspected actual dark-mode screenshots of the empty workspace and mixed completed/failed queue.
+- Used the actual Language picker to switch English → Traditional Chinese → English; new UI text updated without restarting. Existing stored job messages retain upstream's restart behavior.
+- Used the native folder picker to import two disposable synthetic files. Both waited for Start. A 0.2-second clip converted successfully; an invalid fixture displayed a failure and Retry. Clear completed removed the success and preserved the failure. Removed test rows afterward.
+- Found English copy could push language selection below the fold; pinned Language below the inspector's scroll area.
+- Verified normal H.264/AAC remux and MPEG-2/MP2 → H.264/AAC re-encode outputs with ffprobe.
+- Regression suite covers original output-safety fixes, live model notifications, completed-only clearing, protected probing entries and localization bundle lookup.
+- Independent standards/spec review found one wording issue: the checkbox controls video re-encoding while audio repair remains automatic. Corrected both languages and helper text.
+
+Remaining checks: runtime appearance on macOS 13–15, light mode, VoiceOver narration and physical exFAT/FAT32 output volumes. No user media was used. No installation or remote push was performed.

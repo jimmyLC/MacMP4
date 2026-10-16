@@ -9,7 +9,7 @@ struct MacMP4App: App {
 
     var body: some Scene {
         WindowGroup("MacMP4") {
-            ContentView().environmentObject(store)
+            ContentView().environmentObject(store).id(store.appLanguage)
         }
         .defaultSize(width: 960, height: 660)
         .windowStyle(.hiddenTitleBar)
@@ -61,7 +61,7 @@ struct ContentView: View {
 
     private var toolsAvailable: Bool { store.ffmpeg != nil && store.ffprobe != nil }
     private var outputName: String {
-        store.outputToSource ? "與來源影片相同" : store.customOutputDir?.lastPathComponent ?? "尚未選擇"
+        store.outputToSource ? L("與來源影片相同") : store.customOutputDir?.lastPathComponent ?? L("尚未選擇")
     }
 
     var body: some View {
@@ -97,16 +97,16 @@ struct ContentView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text("MacMP4").font(.system(size: 20, weight: .semibold))
-                Text("影片轉檔，簡單完成").font(.caption).foregroundStyle(.secondary)
+                Text(L("影片轉檔，簡單完成")).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             HStack(spacing: 4) {
-                Button(action: pickFiles) { Label("加入影片", systemImage: "plus") }
+                Button(action: pickFiles) { Label(L("加入影片"), systemImage: "plus") }
                     .keyboardShortcut("o", modifiers: .command)
                 Divider().frame(height: 18).padding(.horizontal, 4)
                 Button(action: pickFolder) { Image(systemName: "folder.badge.plus") }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
-                    .help("加入整個資料夾（⇧⌘O）").accessibilityLabel("加入資料夾")
+                    .help(L("加入整個資料夾（⇧⌘O）")).accessibilityLabel(L("加入資料夾"))
             }
             .buttonStyle(.borderless).controlSize(.large)
             .padding(.horizontal, 14).padding(.vertical, 10)
@@ -119,12 +119,12 @@ struct ContentView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 5) {
-                Text("需要先安裝轉檔工具").fontWeight(.medium)
-                Text("在終端機執行 brew install ffmpeg，完成後重新開啟 MacMP4。")
+                Text(L("需要先安裝轉檔工具")).fontWeight(.medium)
+                Text(L("在終端機執行 brew install ffmpeg，完成後重新開啟 MacMP4。"))
                     .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             }
             Spacer()
-            Button("複製指令") {
+            Button(L("複製指令")) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString("brew install ffmpeg", forType: .string)
             }
@@ -135,7 +135,7 @@ struct ContentView: View {
     private var queue: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("轉檔佇列").font(.system(size: 14, weight: .semibold))
+                Text(L("轉檔佇列")).font(.system(size: 14, weight: .semibold))
                 Text("\(store.jobs.count)").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 if !store.jobs.isEmpty {
@@ -157,7 +157,7 @@ struct ContentView: View {
                 .background(Color(nsColor: .textBackgroundColor))
                 HStack(spacing: 6) {
                     Image(systemName: "plus.circle")
-                    Text("隨時拖入更多影片或資料夾")
+                    Text(L("隨時拖入更多影片或資料夾"))
                 }
                 .font(.caption).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).padding(13)
@@ -172,16 +172,16 @@ struct ContentView: View {
                 .font(.system(size: 42, weight: .light))
                 .foregroundStyle(.blue).padding(.bottom, 8)
                 .accessibilityHidden(true)
-            Text("把影片拖到這裡")
+            Text(L("把影片拖到這裡"))
                 .font(.system(size: 24, weight: .semibold))
-            Text("TS、MKV、MOV 等影片，都能轉成 MP4。")
+            Text(L("TS、MKV、MOV 等影片，都能轉成 MP4。"))
                 .font(.callout).foregroundStyle(.secondary)
-            Button("選擇影片…", action: pickFiles)
+            Button(L("選擇影片…"), action: pickFiles)
                 .buttonStyle(.borderedProminent).controlSize(.large).padding(.top, 6)
-            Button("或加入整個資料夾", action: pickFolder)
+            Button(L("或加入整個資料夾"), action: pickFolder)
                 .buttonStyle(.link).font(.callout)
             Spacer(minLength: 24)
-            Text("優先無損轉換，原始影片會保留。")
+            Text(L("優先無損轉換，原始影片會保留。"))
                 .font(.caption).foregroundStyle(.secondary).padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -189,9 +189,10 @@ struct ContentView: View {
     }
 
     private var inspector: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                Text("輸出設定").font(.system(size: 14, weight: .semibold))
+        VStack(spacing: 0) {
+            ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(L("輸出設定")).font(.system(size: 14, weight: .semibold))
                 HStack(spacing: 12) {
                     Text("MP4")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -199,49 +200,57 @@ struct ContentView: View {
                         .frame(width: 62, height: 56)
                         .background(Color.blue.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("相容常見播放器").font(.callout).fontWeight(.medium)
-                        Text("優先保留原始畫質").font(.caption).foregroundStyle(.secondary)
+                        Text(L("相容常見播放器")).font(.callout).fontWeight(.medium)
+                        Text(L("優先保留原始畫質")).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Divider()
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("儲存位置").font(.callout).fontWeight(.medium)
+                    Text(L("儲存位置")).font(.callout).fontWeight(.medium)
                     Label(outputName, systemImage: "folder")
                         .font(.callout).lineLimit(2)
-                        .help(store.outputToSource ? "每支影片旁的來源資料夾" : store.customOutputDir?.path ?? "")
+                        .help(store.outputToSource ? L("每支影片旁的來源資料夾") : store.customOutputDir?.path ?? "")
                     Menu {
-                        Button("與來源影片相同") { store.outputToSource = true }
-                        Button("選擇資料夾…", action: pickOutputDir)
-                    } label: { Text("更改位置…") }
+                        Button(L("與來源影片相同")) { store.outputToSource = true }
+                        Button(L("選擇資料夾…"), action: pickOutputDir)
+                    } label: { Text(L("更改位置…")) }
                     .menuStyle(.borderlessButton).fixedSize()
                     .disabled(store.isRunning)
-                    Text(store.outputToSource ? "MP4 會放在各自的原始影片旁。" : store.customOutputDir?.path ?? "請選擇輸出資料夾。")
+                    Text(store.outputToSource ? L("MP4 會放在各自的原始影片旁。") : store.customOutputDir?.path ?? L("請選擇輸出資料夾。"))
                         .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Divider()
                 VStack(alignment: .leading, spacing: 10) {
-                    Toggle("加入後立即轉換", isOn: $store.autoStart)
-                    Text("關閉時，可先確認清單和儲存位置。")
+                    Toggle(L("加入後立即轉換"), isOn: $store.autoStart)
+                    Text(L("關閉時，可先確認清單和儲存位置。"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .toggleStyle(.switch).controlSize(.small).disabled(store.isRunning)
                 Divider()
-                DisclosureGroup("進階選項", isExpanded: $advancedExpanded) {
+                DisclosureGroup(L("進階選項"), isExpanded: $advancedExpanded) {
                     VStack(alignment: .leading, spacing: 14) {
-                        Toggle("允許覆蓋既有 MP4", isOn: $store.overwrite)
-                        Toggle("必要時重新編碼", isOn: $store.allowReencode)
-                        Text("無損轉換失敗時嘗試修復音訊或重新編碼；重新編碼可能改變畫質。")
+                        Toggle(L("允許覆蓋既有 MP4"), isOn: $store.overwrite)
+                        Toggle(L("必要時重新編碼影片"), isOn: $store.allowReencode)
+                        Text(L("影片重新編碼可能改變畫質；音訊修復仍會自動嘗試。"))
                             .font(.caption).foregroundStyle(.secondary)
-                        Toggle("使用硬體加速", isOn: $store.hardwareAccel)
+                        Toggle(L("使用硬體加速"), isOn: $store.hardwareAccel)
                             .disabled(!store.allowReencode)
-                        Text("僅在重新編碼時使用。")
+                        Text(L("僅在重新編碼時使用。"))
                             .font(.caption).foregroundStyle(.secondary)
                     }.toggleStyle(.checkbox).padding(.top, 12)
                 }
                 .font(.callout).disabled(store.isRunning)
                 Spacer(minLength: 0)
             }.padding(20)
+            }
+            Divider().padding(.horizontal, 20)
+            Picker(L("語言"), selection: $store.appLanguage) {
+                Text(L("跟隨系統")).tag("system")
+                Text("繁體中文").tag("zh-Hant")
+                Text("English").tag("en")
+            }
+            .pickerStyle(.menu).font(.callout).padding(20)
         }
     }
 
@@ -249,35 +258,36 @@ struct ContentView: View {
         HStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(summary).font(.callout).fontWeight(.medium)
-                    .lineLimit(1).accessibilityLabel("佇列狀態：\(summary)")
+                    .lineLimit(1).accessibilityLabel(String(format: L("佇列狀態：%@"), summary))
                 if store.isRunning {
                     ProgressView(value: store.overallProgress)
                         .progressViewStyle(.linear).frame(maxWidth: 260)
-                        .accessibilityLabel("整體進度")
+                        .accessibilityLabel(L("整體進度"))
                 } else if let message = store.flashMessage {
                     Text(message).font(.caption).foregroundStyle(.orange).lineLimit(1)
                 } else {
-                    Text(store.failedCount > 0 ? "失敗的影片可在清單中重試。" : "輸出為 MP4，原始檔案不會移除。")
+                    Text(store.failedCount > 0 ? L("失敗的影片可在清單中重試。") : L("輸出為 MP4，原始檔案不會移除。"))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             Spacer(minLength: 0)
             if store.finishedCount > 0 {
-                Button("移除已完成") { store.clearFinished() }
+                Button(L("移除已完成")) { store.clearFinished() }
                     .buttonStyle(.borderless).font(.callout)
-                    .help("移除完成與略過的項目，保留失敗項目")
+                    .help(L("移除完成與略過的項目，保留失敗項目"))
             }
             if store.isRunning {
-                Button { store.stop() } label: { Label("停止轉檔", systemImage: "stop.fill") }
+                Button { store.stop() } label: { Label(L("停止轉檔"), systemImage: "stop.fill") }
                     .buttonStyle(.bordered).controlSize(.large)
-                    .help("停止目前轉檔，保留既有輸出與等待中的影片")
+                    .help(L("停止目前轉檔，保留既有輸出與等待中的影片"))
             } else {
                 Button { store.start() } label: {
-                    Label(store.hasWaiting ? "開始轉檔（\(store.waitingCount)）" : "開始轉檔", systemImage: "arrow.right")
+                    Label(store.hasWaiting ? String(format: L("開始轉檔（%d）"), store.waitingCount) : L("開始轉檔"), systemImage: "arrow.right")
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!store.hasWaiting || !toolsAvailable)
+                .opacity(!store.hasWaiting || !toolsAvailable ? 0.45 : 1)
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 16)
@@ -285,11 +295,11 @@ struct ContentView: View {
     }
 
     private var summary: String {
-        if store.jobs.isEmpty { return "準備好你的影片" }
-        if store.isRunning { return "轉檔中 · 已處理 \(store.processedCount) / \(store.jobs.count)" }
-        if store.hasWaiting { return "\(store.waitingCount) 支影片準備轉檔" }
-        if store.failedCount > 0 { return "\(store.doneCount) 支完成，\(store.failedCount) 支需要處理" }
-        return "已處理全部 \(store.jobs.count) 支影片"
+        if store.jobs.isEmpty { return L("準備好你的影片") }
+        if store.isRunning { return String(format: L("轉檔中 · 已處理 %d / %d"), store.processedCount, store.jobs.count) }
+        if store.hasWaiting { return String(format: L("%d 支影片準備轉檔"), store.waitingCount) }
+        if store.failedCount > 0 { return String(format: L("%d 支完成，%d 支需要處理"), store.doneCount, store.failedCount) }
+        return String(format: L("已處理全部 %d 支影片"), store.jobs.count)
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
@@ -314,8 +324,8 @@ struct ContentView: View {
         panel.allowsMultipleSelection = true
         panel.canChooseFiles = !folder
         panel.canChooseDirectories = folder
-        panel.message = folder ? "選擇包含影片的資料夾" : "選擇要轉成 MP4 的影片"
-        panel.prompt = "加入佇列"
+        panel.message = folder ? L("選擇包含影片的資料夾") : L("選擇要轉成 MP4 的影片")
+        panel.prompt = L("加入佇列")
         if !folder {
             panel.allowedContentTypes = JobStore.videoExtensions.compactMap { UTType(filenameExtension: $0) }
         }
@@ -326,8 +336,8 @@ struct ContentView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
-        panel.message = "選擇 MP4 儲存位置"
-        panel.prompt = "選擇位置"
+        panel.message = L("選擇 MP4 儲存位置")
+        panel.prompt = L("選擇位置")
         if panel.runModal() == .OK, let url = panel.urls.first {
             store.customOutputDir = url
             store.outputToSource = false
@@ -354,30 +364,30 @@ struct JobRow: View {
                 Text(metadata).font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 5) {
                     Image(systemName: statusSymbol)
-                    Text(statusText).textSelection(.enabled)
+                    Text(statusText).id(statusText).textSelection(.enabled)
                 }
                 .font(.caption).foregroundStyle(statusColor)
                 .fixedSize(horizontal: false, vertical: true)
                 if case .converting(let percent, _, _) = job.status {
                     if percent >= 0 {
                         ProgressView(value: percent, total: 100).progressViewStyle(.linear)
-                            .accessibilityLabel("\(job.url.lastPathComponent) 轉檔進度")
-                    } else { ProgressView().controlSize(.small).accessibilityLabel("轉檔中") }
+                            .accessibilityLabel(String(format: L("%@ 轉檔進度"), job.url.lastPathComponent))
+                    } else { ProgressView().controlSize(.small).accessibilityLabel(L("轉檔中")) }
                 }
             }
             Spacer(minLength: 4)
             HStack(spacing: 10) {
                 if case .done = job.status {
                     Button(action: reveal) { Image(systemName: "folder") }
-                        .help("在 Finder 中顯示 MP4").accessibilityLabel("顯示轉出的 MP4")
+                        .help(L("在 Finder 中顯示 MP4")).accessibilityLabel(L("顯示轉出的 MP4"))
                 }
                 if case .failed = job.status {
-                    Button("重試") { store.retry(job) }.disabled(store.isRunning)
+                    Button(L("重試")) { store.retry(job) }.disabled(store.isRunning)
                 }
                 if !busy {
                     Button { store.remove(job) } label: { Image(systemName: "xmark") }
-                        .foregroundStyle(.secondary).help("從佇列移除，不會刪除檔案")
-                        .accessibilityLabel("從佇列移除 \(job.url.lastPathComponent)")
+                        .foregroundStyle(.secondary).help(L("從佇列移除，不會刪除檔案"))
+                        .accessibilityLabel(String(format: L("從佇列移除 %@"), job.url.lastPathComponent))
                 }
             }.buttonStyle(.borderless).controlSize(.small).padding(.top, 3)
         }
@@ -385,25 +395,25 @@ struct JobRow: View {
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: reveal)
         .contextMenu {
-            Button("在 Finder 中顯示", action: reveal)
-            if !busy { Button("從佇列移除") { store.remove(job) } }
+            Button(L("在 Finder 中顯示"), action: reveal)
+            if !busy { Button(L("從佇列移除")) { store.remove(job) } }
         }
     }
     private var metadata: String {
         let size = ByteCountFormatter.string(fromByteCount: job.size, countStyle: .file)
-        let duration = job.duration.map { " · \(formatDuration($0))" } ?? ""
+        let duration = job.duration.map { " · \($0 < 1 ? formatElapsed($0) : formatDuration($0))" } ?? ""
         return "\(job.url.pathExtension.uppercased()) → MP4 · \(size)\(duration)"
     }
     private var statusText: String {
         switch job.status {
-        case .waiting: return "等待轉檔"
-        case .probing: return "正在讀取影片…"
+        case .waiting: return L("等待轉檔")
+        case .probing: return L("正在讀取影片…")
         case .converting(let percent, let speed, let label):
             let progress = percent < 0 ? "" : String(format: " · %.0f%%", percent)
             return label + progress + (speed.isEmpty ? "" : " · \(speed)")
-        case .done(let strategy, let elapsed): return "\(strategy)完成 · \(formatElapsed(elapsed))"
-        case .failed(let message): return "轉檔失敗：\(message)"
-        case .skipped(let message): return "已略過：\(message)"
+        case .done(let strategy, let elapsed): return String(format: L("%@完成 · %@"), strategy, formatElapsed(elapsed))
+        case .failed(let message): return String(format: L("轉檔失敗：%@"), message)
+        case .skipped(let message): return String(format: L("已略過：%@"), message)
         }
     }
     private var statusSymbol: String {

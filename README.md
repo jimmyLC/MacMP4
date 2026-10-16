@@ -29,6 +29,7 @@ MacMP4 wraps a fast remux engine with a forgiving, auto-fallback pipeline into a
 - 🧯 **Damage-tolerant** — corrupt packets are skipped (`-err_detect ignore_err -fflags +discardcorrupt`) instead of aborting the conversion.
 - 🎛 **GPU acceleration** — the re-encode fallback uses Apple's **VideoToolbox** hardware encoder (`h264_videotoolbox`) by default, with automatic fallback to CPU x264 (CRF 18).
 - 📁 **Output next to the source** by default, or choose any folder.
+- 🌐 **Bilingual UI** — English / Traditional Chinese, follows the system language (in-app override available).
 - ⌨️ **CLI included** for scripting.
 
 ## Supported input formats
@@ -66,7 +67,7 @@ The build produces:
 
 1. Launch `MacMP4.app`
 2. Drag in video files or folders (or use the *Add files* / *Add folder* buttons)
-3. Conversion starts automatically (toggleable). Per-file progress and speed are shown live
+3. Review the queue and output location, then click **Start conversion**. Immediate conversion is optional. Per-file progress and speed are shown live
 4. Click the folder icon on a finished row to reveal the MP4 in Finder
 
 Options: output location, overwrite existing MP4s, automatic re-encode fallback, GPU acceleration.
@@ -126,3 +127,9 @@ build.sh                build script
 Conversions are staged beside the destination and validated before the final MP4 is atomically replaced. Failed or cancelled attempts preserve existing output files. Directory and symbolic-link destinations are rejected. Valid sub-second clips are supported.
 
 Run `python3 Tests/regressions.py` on macOS with Swift, Python 3, ffmpeg and ffprobe installed. The suite uses disposable synthetic media and covers CLI conversion, GUI queue-model cancellation, output preservation and noisy probing.
+
+## Interface and languages
+
+The queue sits beside a persistent output inspector, with Start/Stop in the bottom action shelf. Advanced options are collapsed initially. Clearing completed retains failed items for retry. The interface supports system default, Traditional Chinese and English through the inspector's Language menu. Some existing job messages may require reopening the app to fully adopt a language change.
+
+On macOS 26+, the import control and action shelf use native Liquid Glass. Earlier systems use standard system material. File rows stay readable, and system Reduce Transparency / Reduce Motion preferences are respected. The app icon uses a simple pair of opposing blue arrows.
