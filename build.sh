@@ -44,6 +44,9 @@ else
     echo "    (圖示產生失敗,使用系統預設圖示)"
 fi
 
+echo "==> 語系資源"
+cp -R Resources/*.lproj "$APP/Contents/Resources/"
+
 echo "==> Info.plist"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -52,6 +55,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <dict>
     <key>CFBundleName</key><string>MacMP4</string>
     <key>CFBundleDisplayName</key><string>MacMP4</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleExecutable</key><string>MacMP4</string>
     <key>CFBundleIdentifier</key><string>local.jimmy.MacMP4</string>
     <key>CFBundlePackageType</key><string>APPL</string>

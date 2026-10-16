@@ -28,6 +28,7 @@ MacMP4 把「快速 remux 引擎 + 容錯自動降級」包成一個小小的原
 - 🧯 **容錯** — 損壞封包自動跳過(`-err_detect ignore_err -fflags +discardcorrupt`),不會因一顆老鼠屎整鍋倒掉
 - 🎛 **GPU 硬體加速** — 重新編碼時預設使用 Apple **VideoToolbox** 硬體編碼器(`h264_videotoolbox`),失敗自動退回 CPU x264(CRF 18)
 - 📁 輸出預設**同來源資料夾**,也可自選
+- 🌐 **雙語介面** — 英文 / 繁體中文,跟隨系統語言(也可在 App 內手動切換)
 - ⌨️ 附**命令列版**,方便寫腳本
 
 ## 支援的輸入格式
