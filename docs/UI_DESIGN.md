@@ -51,3 +51,7 @@ Merged origin/main at 570a200. Preserved upstream L(), AppLanguage persistence, 
 - Independent standards/spec review found one wording issue: the checkbox controls video re-encoding while audio repair remains automatic. Corrected both languages and helper text.
 
 Remaining checks: runtime appearance on macOS 13–15, light mode, VoiceOver narration and physical exFAT/FAT32 output volumes. No user media was used. No installation or remote push was performed.
+
+## Primary action contrast correction
+
+Replaced the system prominent-button rendering inside the glass shelf with an explicit native ButtonStyle: opaque white semibold label and arrow over a solid deep-blue capsule. The specified enabled colors have a calculated contrast ratio of 5.87:1. Disabled state uses a neutral system surface and readable grey text instead of reducing the opacity of the entire button. Inspected both states in the running app using a disposable waiting fixture, then removed it from the queue. Build and existing regression suite passed.
