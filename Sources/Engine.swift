@@ -80,21 +80,22 @@ enum FF {
     static let mp4AudioCodecs: Set<String> = ["aac", "mp3", "alac", "ac3", "eac3"]
 
     /// 依來源編碼決定轉換策略(由快到慢,逐一嘗試)
-    static func strategies(for probe: ProbeResult, allowReencode: Bool, hardwareAccel: Bool) -> [Strategy] {
+    static func strategies(for probe: ProbeResult, allowReencode: Bool, hardwareAccel: Bool, forceH264: Bool = false) -> [Strategy] {
+        if forceH264 && !probe.hasVideo { return [] }
         let maps = ["-map", "0:v:0?", "-map", "0:a:0?"]
         let vOK = probe.videoCodec.map { mp4VideoCodecs.contains($0) } ?? false
         let aOK = probe.audioCodec.map { mp4AudioCodecs.contains($0) } ?? true
         var list: [Strategy] = []
 
-        if probe.hasVideo && vOK && aOK {
+        if !forceH264 && probe.hasVideo && vOK && aOK {
             // 最理想:影片+音訊都直接複製,零損失、極快(純 I/O,無需也無法用 GPU 加速)
             list.append(Strategy(label: L("無損轉換"), args: maps + ["-c", "copy"]))
         }
-        if probe.hasVideo && vOK {
+        if !forceH264 && probe.hasVideo && vOK {
             // 音訊重編碼:修復損壞的 AAC 幀等問題(影片仍為複製)
             list.append(Strategy(label: L("修復音訊"), args: maps + ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"]))
         }
-        if allowReencode {
+        if allowReencode || forceH264 {
             if hardwareAccel {
                 // GPU 硬體編碼:Apple VideoToolbox(媒體引擎),速度快、省電
                 list.append(Strategy(label: L("GPU 硬體編碼"), args: maps + [
@@ -109,6 +110,11 @@ enum FF {
             ]))
         }
         return list
+    }
+
+    static func outputIsValid(_ probe: ProbeResult, forceH264: Bool) -> Bool {
+        probe.isValidOutput && (!forceH264 ||
+            (probe.videoCodec == "h264" && (probe.audioCodec == nil || probe.audioCodec == "aac")))
     }
 
     /// 執行 ffmpeg 轉換。progress: (百分比(-1=未知), 速度字串)

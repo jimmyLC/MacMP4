@@ -102,6 +102,7 @@ struct ContentView: View {
     @State private var advancedExpanded = false
     @State private var showingToolSetup = false
     @State private var showingAppearance = false
+    @State private var showingThanks = false
 
     private var toolsAvailable: Bool { store.ffmpeg != nil && store.ffprobe != nil }
     private var outputName: String {
@@ -124,6 +125,7 @@ struct ContentView: View {
         .tint(.blue)
         .sheet(isPresented: $showingAbout) { AboutView().environmentObject(access) }
         .sheet(isPresented: $showingAppearance) { AppearanceView().environmentObject(access) }
+        .sheet(isPresented: $showingThanks) { SuperThanksView().environmentObject(access) }
         .sheet(isPresented: $showingToolSetup) { ToolSetupView().environmentObject(store) }
         .onAppear {
             store.refreshTools()
@@ -236,7 +238,7 @@ struct ContentView: View {
             Button(L("或加入整個資料夾"), action: pickFolder)
                 .buttonStyle(.link).font(.callout)
             Spacer(minLength: 24)
-            Text(L("優先無損轉換，原始影片會保留。"))
+            Text(store.forceH264 ? L("強制輸出 H.264，原始影片會保留。") : L("優先無損轉換，原始影片會保留。"))
                 .font(.caption).foregroundStyle(.secondary).padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -256,7 +258,7 @@ struct ContentView: View {
                         .background(Color.blue.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(L("相容常見播放器")).font(.callout).fontWeight(.medium)
-                        Text(L("優先保留原始畫質")).font(.caption).foregroundStyle(.secondary)
+                        Text(store.forceH264 ? L("H.264 影片與 AAC 音訊") : L("優先保留原始畫質")).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Divider()
@@ -286,11 +288,17 @@ struct ContentView: View {
                 DisclosureGroup(L("進階選項"), isExpanded: $advancedExpanded) {
                     VStack(alignment: .leading, spacing: 14) {
                         Toggle(L("允許覆蓋既有 MP4"), isOn: $store.overwrite)
+                        Toggle(L("強制 H.264"), isOn: $store.forceH264)
+                        if store.forceH264 {
+                            Text(L("輸出 H.264 影片與 AAC 音訊。"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         Toggle(L("必要時重新編碼影片"), isOn: $store.allowReencode)
-                        Text(L("影片重新編碼可能改變畫質；音訊修復仍會自動嘗試。"))
+                            .disabled(store.forceH264)
+                        Text(L("音訊修復會自動嘗試。"))
                             .font(.caption).foregroundStyle(.secondary)
                         Toggle(L("使用硬體加速"), isOn: $store.hardwareAccel)
-                            .disabled(!store.allowReencode)
+                            .disabled(!store.allowReencode && !store.forceH264)
                         Text(L("僅在重新編碼時使用。"))
                             .font(.caption).foregroundStyle(.secondary)
                     }.toggleStyle(.checkbox).padding(.top, 12)
@@ -310,6 +318,16 @@ struct ContentView: View {
             }
             .buttonStyle(.plain).font(.callout)
             .padding(.horizontal, 20).padding(.top, 14)
+            Button { showingThanks = true } label: {
+                Label {
+                    Text(L("超級感謝"))
+                } icon: {
+                    SuperThanksIcon()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain).font(.callout.weight(.medium)).foregroundStyle(.secondary)
+            .padding(.horizontal, 20).padding(.top, 12)
             Picker(L("語言"), selection: $store.appLanguage) {
                 Text(L("跟隨系統")).tag("system")
                 Text("繁體中文").tag("zh-Hant")

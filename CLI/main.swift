@@ -11,6 +11,7 @@ func printUsage() {
     選項:
       --out <目錄>      指定輸出資料夾(預設:與來源同資料夾)
       --no-overwrite    輸出檔已存在時略過(預設覆蓋)
+      --force-h264     強制輸出 H.264 影片與 AAC 音訊(預設關閉)
       --no-reencode     停用「失敗時自動重新編碼」的最後手段
       --no-gpu          重新編碼時不使用 GPU 硬體加速(改用 CPU)
       -h, --help        顯示說明
@@ -22,6 +23,7 @@ func printUsage() {
 var inputs: [URL] = []
 var outDir: URL?
 var overwrite = true
+var forceH264 = false
 var allowReencode = true
 var hardwareAccel = true
 
@@ -34,6 +36,8 @@ while i < args.count {
         if i < args.count { outDir = URL(fileURLWithPath: args[i]) }
     case "--no-overwrite":
         overwrite = false
+    case "--force-h264":
+        forceH264 = true
     case "--no-reencode":
         allowReencode = false
     case "--no-gpu":
@@ -45,6 +49,11 @@ while i < args.count {
         inputs.append(URL(fileURLWithPath: args[i]))
     }
     i += 1
+}
+
+if forceH264 && !allowReencode {
+    FileHandle.standardError.write(Data("--force-h264 不能與 --no-reencode 同時使用。\n".utf8))
+    exit(2)
 }
 
 guard !inputs.isEmpty else {
@@ -109,7 +118,7 @@ for (idx, input) in files.enumerated() {
         failures += 1
         continue
     }
-    let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel)
+    let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel, forceH264: forceH264)
     if strategies.isEmpty {
         print("    ✗ 影片編碼 \(probe.videoCodec ?? "?") 無法封裝成 MP4(可移除 --no-reencode)")
         failures += 1
@@ -139,7 +148,7 @@ for (idx, input) in files.enumerated() {
             fflush(stdout)
         }
         print("\r" + String(repeating: " ", count: 40) + "\r", terminator: "")
-        if ok, let outProbe = FF.probe(url: transaction.temporaryURL, ffprobe: ffprobe), outProbe.isValidOutput {
+        if ok, let outProbe = FF.probe(url: transaction.temporaryURL, ffprobe: ffprobe), FF.outputIsValid(outProbe, forceH264: forceH264) {
             do { try transaction.commit() }
             catch {
                 print("    ✗ 無法儲存輸出: \(error.localizedDescription)")

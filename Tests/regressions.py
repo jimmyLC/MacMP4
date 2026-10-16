@@ -38,6 +38,22 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
     for path, duration in [(normal, '1'), (short, '0.2')]:
         result = run([FFMPEG, '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=64x64:rate=30', '-t', duration, '-c:v', 'libx264', '-f', 'mpegts', path])
         require(result.returncode == 0, result.stderr)
+    hevc = tmp/'hevc.mkv'
+    fixture = run([FFMPEG, '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=64x64:rate=30', '-f', 'lavfi', '-i', 'sine=frequency=440', '-t', '0.3', '-c:v', 'libx265', '-x265-params', 'log-level=error:pools=1:frame-threads=1', '-c:a', 'aac', hevc])
+    require(fixture.returncode == 0, fixture.stderr)
+    def force_h264():
+        for name, options, expected in [('copy', ['--no-gpu'], 'hevc'), ('forced-cpu', ['--force-h264', '--no-gpu'], 'h264'), ('forced-auto', ['--force-h264'], 'h264')]:
+            output_dir = tmp/name
+            output_dir.mkdir()
+            result = run([cli, '--out', output_dir, *options, hevc])
+            require(result.returncode == 0, result.stdout+result.stderr)
+            probe_result = run([FFPROBE, '-v', 'error', '-show_streams', '-of', 'json', output_dir/'hevc.mp4'])
+            streams = json.loads(probe_result.stdout)['streams']
+            require(any(s['codec_type']=='video' and s['codec_name']==expected for s in streams), name+' wrong video codec')
+            require(any(s['codec_type']=='audio' and s['codec_name']=='aac' for s in streams), name+' wrong audio codec')
+        conflict = run([cli, '--force-h264', '--no-reencode', hevc])
+        require(conflict.returncode == 2, 'conflicting flags silently accepted')
+    check('H.265 default copy and forced H.264/AAC CPU and automatic hardware fallback', force_h264)
     def directory_preserved():
         output = tmp/'normal.mp4'
         output.mkdir()
@@ -77,7 +93,7 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
         require(result.returncode == 0, result.stdout + result.stderr)
         print(result.stdout.strip(), flush=True)
     check('transaction regression suite', lambda: swift_regression('output-tests', [ROOT/'Tests/OutputRegression.swift'], []))
-    check('GUI model regression suite', lambda: swift_regression('model-tests', [ROOT/'Sources/Model.swift', ROOT/'Tests/ModelRegression.swift'], [short, FFMPEG, FFPROBE]))
+    check('GUI model regression suite', lambda: swift_regression('model-tests', [ROOT/'Sources/Model.swift', ROOT/'Tests/ModelRegression.swift'], [short, FFMPEG, FFPROBE, hevc]))
     check('tool installer regression suite', lambda: swift_regression('tool-setup-tests', [ROOT/'Sources/Model.swift', ROOT/'Sources/ToolSetup.swift', ROOT/'Tests/ToolSetupRegression.swift'], []))
     check('appearance entitlement regression suite', lambda: swift_regression('appearance-tests', [ROOT/'Sources/AppAccess.swift', ROOT/'Tests/AppearanceRegression.swift'], []))
     def localization():

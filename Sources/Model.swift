@@ -38,6 +38,7 @@ final class JobStore: ObservableObject {
     @Published var outputToSource = true
     @Published var customOutputDir: URL?
     @Published var overwrite = false
+    @Published var forceH264 = false
     @Published var allowReencode = true
     @Published var hardwareAccel = true
     @Published var autoStart = false
@@ -310,7 +311,11 @@ final class JobStore: ObservableObject {
             return
         }
 
-        let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel)
+        if forceH264 && !probe.hasVideo {
+            setStatus(job, .failed(L("強制 H.264 需要來源包含影片串流。")))
+            return
+        }
+        let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel, forceH264: forceH264)
         if strategies.isEmpty {
             setStatus(job, .failed(String(format: L("影片編碼 %@ 無法直接封裝成 MP4，請開啟「必要時重新編碼影片」。"), probe.videoCodec ?? "?")))
             return
@@ -340,7 +345,7 @@ final class JobStore: ObservableObject {
             procLock.lock(); currentProcess = nil; procLock.unlock()
 
             if stopRequested { setStatus(job, .waiting); return }
-            if ok, let outProbe = self.probe(transaction.temporaryURL, using: ffprobe), outProbe.isValidOutput {
+            if ok, let outProbe = self.probe(transaction.temporaryURL, using: ffprobe), FF.outputIsValid(outProbe, forceH264: forceH264) {
                 if stopRequested { setStatus(job, .waiting); return }
                 do { try transaction.commit() }
                 catch {

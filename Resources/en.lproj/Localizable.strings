@@ -223,3 +223,31 @@
 "Pro 可使用此功能" = "Available with Pro";
 
 "版本與外觀設定" = "Edition and appearance settings";
+
+"強制 H.264" = "Force H.264";
+
+"輸出 H.264 影片與 AAC 音訊。" = "Output H.264 video and AAC audio.";
+
+"H.264 影片與 AAC 音訊" = "H.264 video and AAC audio";
+
+"強制輸出 H.264，原始影片會保留。" = "Force H.264 output. Your original videos stay untouched.";
+
+"音訊修復會自動嘗試。" = "Audio repair is attempted automatically.";
+
+"強制 H.264 需要來源包含影片串流。" = "Force H.264 requires a source with a video stream.";
+
+"超級感謝" = "Super Thanks";
+
+"支持 MacMP4 的後續開發。" = "Support the continued development of MacMP4.";
+
+"NT$90 終身買斷" = "NT$90 lifetime purchase";
+
+"專屬 Pro 標誌" = "Exclusive Pro badge";
+
+"淺色、深色與跟隨系統外觀" = "Light, Dark and System appearance";
+
+"完整轉檔功能維持免費" = "All conversion features remain free";
+
+"感謝你的支持，你目前使用 Pro 版本。" = "Thank you for your support. You are using Pro.";
+
+"Pro 升級即將開放，目前尚未提供付款。" = "Pro upgrades are coming soon. Payment is not available yet.";

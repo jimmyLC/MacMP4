@@ -35,6 +35,16 @@ struct ModelRegression {
         setup.isRunning = false
         setup.refreshTools { _ in nil }
         precondition(setup.ffmpeg == nil && setup.ffprobe == nil, "removed tool was not detected")
+        let forcedInput = root.appendingPathComponent("hevc.mkv")
+        try fm.copyItem(at: URL(fileURLWithPath: args[4]), to: forcedInput)
+        let forcedStore = store(ffmpeg, ffprobe)
+        precondition(!forcedStore.forceH264, "force H.264 must default off")
+        forcedStore.forceH264 = true
+        forcedStore.allowReencode = false
+        forcedStore.add(urls: [forcedInput]); forcedStore.start(); wait { !forcedStore.isRunning }
+        guard case .done = forcedStore.jobs[0].status else { fatalError("forced GUI conversion failed") }
+        guard let result = FF.probe(url: root.appendingPathComponent("hevc.mp4"), ffprobe: ffprobe) else { fatalError("forced output missing") }
+        precondition(result.videoCodec == "h264" && result.audioCodec == "aac")
         let input = root.appendingPathComponent("clip.ts")
         let output = root.appendingPathComponent("clip.mp4")
         try fm.copyItem(at: source, to: input)
