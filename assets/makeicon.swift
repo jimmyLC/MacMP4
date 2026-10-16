@@ -44,11 +44,11 @@ NSGraphicsContext.current = context
 context.cgContext.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
 let tile = NSBezierPath(roundedRect: NSRect(x: 100, y: 100, width: 824, height: 824), xRadius: 184, yRadius: 184)
 withShadow(blur: 16, offset: -9, alpha: 0.13) {
-    gradient(tile, [color(0xFCFEFF), color(0xEDF5FC), color(0xDCE9F7)], angle: -65)
+    gradient(tile, [color(0x303239), color(0x23252B), color(0x17191E)], angle: -65)
 }
-color(0xFFFFFF, 0.95).setStroke(); tile.lineWidth = 3; tile.stroke()
+color(0xFFFFFF, 0.14).setStroke(); tile.lineWidth = 3; tile.stroke()
 let inset = NSBezierPath(roundedRect: NSRect(x: 107, y: 107, width: 810, height: 810), xRadius: 177, yRadius: 177)
-color(0x92B8D8, 0.16).setStroke(); inset.lineWidth = 1.5; inset.stroke()
+color(0xFFFFFF, 0.05).setStroke(); inset.lineWidth = 1.5; inset.stroke()
 
 // The arrows share the same line weight, 45-degree heads and rounded ends.
 // Upper points left; lower points right, matching the supplied reference.
