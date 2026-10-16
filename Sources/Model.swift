@@ -1,0 +1,295 @@
+// Model.swift — 佇列與批次轉換邏輯
+import Foundation
+import Combine
+import AppKit
+
+enum JobStatus: Equatable {
+    case waiting
+    case probing
+    case converting(percent: Double, speed: String, label: String)
+    case done(strategy: String, elapsed: Double)
+    case failed(String)
+    case skipped(String)
+}
+
+final class Job: ObservableObject, Identifiable {
+    let id = UUID()
+    let url: URL
+    let size: Int64
+    @Published var status: JobStatus = .waiting
+    @Published var duration: Double?
+    @Published var outURL: URL?
+
+    init(url: URL) {
+        self.url = url
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        self.size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
+    }
+}
+
+final class JobStore: ObservableObject {
+    static let shared = JobStore()
+
+    let ffmpeg: String?
+    let ffprobe: String?
+
+    @Published var jobs: [Job] = []
+    @Published var isRunning = false
+    @Published var outputToSource = true
+    @Published var customOutputDir: URL?
+    @Published var overwrite = false
+    @Published var allowReencode = true
+    @Published var hardwareAccel = true
+    @Published var autoStart = true
+    @Published var flashMessage: String?
+
+    private var pending: [Job] = []
+    private var pendingIDs = Set<UUID>()
+    private let lock = NSLock()
+    private var stopRequested = false
+    private var currentProcess: Process?
+    private var procLock = NSLock()
+    private let worker = DispatchQueue(label: "macmp4.worker", qos: .userInitiated)
+
+    static let videoExtensions: Set<String> = supportedVideoExtensions
+
+    init() {
+        ffmpeg = FF.findTool("ffmpeg")
+        ffprobe = FF.findTool("ffprobe")
+    }
+
+    // MARK: - 對外操作(全部在主執行緒呼叫)
+
+    var hasWaiting: Bool {
+        jobs.contains { if case .waiting = $0.status { return true } else { return false } }
+    }
+
+    var doneCount: Int {
+        jobs.filter { if case .done = $0.status { return true } else { return false } }.count
+    }
+
+    var overallProgress: Double {
+        guard !jobs.isEmpty else { return 0 }
+        var total = 0.0
+        for j in jobs {
+            switch j.status {
+            case .done, .skipped: total += 1
+            case .converting(let p, _, _): total += max(0, p) / 100
+            default: break
+            }
+        }
+        return total / Double(jobs.count)
+    }
+
+    func add(urls: [URL]) {
+        var existing = Set(jobs.map { $0.url.standardizedFileURL.path })
+        var newJobs: [Job] = []
+        var ignored = 0
+
+        for u in urls {
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir) else { continue }
+            if isDir.boolValue {
+                if let en = FileManager.default.enumerator(
+                    at: u,
+                    includingPropertiesForKeys: [.isRegularFileKey],
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                ) {
+                    var count = 0
+                    for case let f as URL in en {
+                        if count >= 2000 { break }
+                        guard Self.videoExtensions.contains(f.pathExtension.lowercased()) else { continue }
+                        let key = f.standardizedFileURL.path
+                        if existing.contains(key) { continue }
+                        existing.insert(key)
+                        newJobs.append(Job(url: f))
+                        count += 1
+                    }
+                }
+            } else {
+                if Self.videoExtensions.contains(u.pathExtension.lowercased()) {
+                    let key = u.standardizedFileURL.path
+                    if !existing.contains(key) {
+                        existing.insert(key)
+                        newJobs.append(Job(url: u))
+                    }
+                } else {
+                    ignored += 1
+                }
+            }
+        }
+
+        newJobs.sort {
+            $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending
+        }
+        if !newJobs.isEmpty { jobs.append(contentsOf: newJobs) }
+        if ignored > 0 { flash("已忽略 \(ignored) 個不支援的檔案") }
+        if autoStart { start() }
+    }
+
+    func start() {
+        guard ffmpeg != nil, ffprobe != nil else { return }
+        enqueueNew()
+        if !isRunning, hasPending() {
+            isRunning = true
+            stopRequested = false
+            worker.async { [weak self] in self?.runLoop() }
+        }
+    }
+
+    func stop() {
+        stopRequested = true
+        procLock.lock()
+        let p = currentProcess
+        procLock.unlock()
+        p?.terminate()
+    }
+
+    func remove(_ job: Job) {
+        if case .converting = job.status { return }
+        jobs.removeAll { $0.id == job.id }
+        lock.lock()
+        pending.removeAll { $0.id == job.id }
+        pendingIDs.remove(job.id)
+        lock.unlock()
+    }
+
+    func retry(_ job: Job) {
+        if case .failed = job.status {
+            job.status = .waiting
+            start()
+        }
+    }
+
+    func clearFinished() {
+        jobs.removeAll { j in
+            switch j.status {
+            case .done, .failed, .skipped: return true
+            default: return false
+            }
+        }
+    }
+
+    // MARK: - 內部
+
+    private func flash(_ s: String) {
+        flashMessage = s
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+            if self?.flashMessage == s { self?.flashMessage = nil }
+        }
+    }
+
+    private func enqueueNew() {
+        lock.lock()
+        defer { lock.unlock() }
+        for j in jobs {
+            if case .waiting = j.status, !pendingIDs.contains(j.id) {
+                pending.append(j)
+                pendingIDs.insert(j.id)
+            }
+        }
+    }
+
+    private func hasPending() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return !pending.isEmpty
+    }
+
+    private func nextPending() -> Job? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !pending.isEmpty else { return nil }
+        let j = pending.removeFirst()
+        pendingIDs.remove(j.id)
+        return j
+    }
+
+    private func runLoop() {
+        while !stopRequested {
+            guard let job = nextPending() else { break }
+            guard !stopRequested else { setStatus(job, .waiting); break }
+            process(job)
+        }
+        DispatchQueue.main.async {
+            self.isRunning = false
+            self.procLock.lock(); self.currentProcess = nil; self.procLock.unlock()
+            if !self.stopRequested, self.hasPending() { self.start() }
+        }
+    }
+
+    private func setStatus(_ job: Job, _ s: JobStatus) {
+        DispatchQueue.main.async { job.status = s }
+    }
+
+    private func process(_ job: Job) {
+        guard let ffmpeg, let ffprobe else { return }
+        let fm = FileManager.default
+        let ext = job.url.pathExtension.lowercased()
+
+        if ext == "mp4" || ext == "m4v" {
+            setStatus(job, .skipped("已是 MP4 格式"))
+            return
+        }
+
+        let outDir: URL
+        if outputToSource || customOutputDir == nil {
+            outDir = job.url.deletingLastPathComponent()
+        } else {
+            outDir = customOutputDir!
+        }
+        let outURL = outDir.appendingPathComponent(job.url.deletingPathExtension().lastPathComponent + ".mp4")
+
+        if fm.fileExists(atPath: outURL.path) && !overwrite {
+            setStatus(job, .skipped("輸出檔已存在"))
+            return
+        }
+
+        let startTime = Date()
+        setStatus(job, .probing)
+        guard let probe = FF.probe(url: job.url, ffprobe: ffprobe) else {
+            setStatus(job, .failed("無法讀取檔案"))
+            return
+        }
+        DispatchQueue.main.async { job.duration = probe.duration }
+        guard probe.hasVideo || probe.hasAudio else {
+            setStatus(job, .failed("找不到影音串流"))
+            return
+        }
+
+        let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel)
+        if strategies.isEmpty {
+            setStatus(job, .failed("影片編碼 \(probe.videoCodec ?? "?") 無法直接封裝成 MP4,可勾選「失敗時自動重新編碼」"))
+            return
+        }
+
+        for strategy in strategies {
+            if stopRequested { setStatus(job, .waiting); return }
+
+            setStatus(job, .converting(percent: probe.duration == nil ? -1 : 0, speed: "", label: strategy.label))
+
+            let ok = FF.run(ffmpeg: ffmpeg, input: job.url, output: outURL, strategy: strategy,
+                            duration: probe.duration,
+                            didStart: { [weak self] p in
+                                guard let self else { return }
+                                self.procLock.lock(); self.currentProcess = p; self.procLock.unlock()
+                            },
+                            progress: { [weak self] pct, speed in
+                                self?.setStatus(job, .converting(percent: pct, speed: speed, label: strategy.label))
+                            })
+
+            procLock.lock(); currentProcess = nil; procLock.unlock()
+
+            if ok, let outProbe = FF.probe(url: outURL, ffprobe: ffprobe), (outProbe.duration ?? 0) > 0.5 {
+                DispatchQueue.main.async { job.outURL = outURL }
+                setStatus(job, .done(strategy: strategy.label, elapsed: Date().timeIntervalSince(startTime)))
+                return
+            }
+
+            try? fm.removeItem(at: outURL)
+            if stopRequested { setStatus(job, .waiting); return }
+        }
+
+        setStatus(job, .failed("轉換失敗(來源檔可能損壞)"))
+    }
+}
