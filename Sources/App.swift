@@ -53,6 +53,29 @@ private struct ControlSurface: ViewModifier {
     }
 }
 
+private struct PrimaryActionStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(isEnabled ? Color.white :
+                (colorScheme == .dark ? Color.white.opacity(0.75) : Color.black.opacity(0.65)))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 11)
+            .background {
+                Capsule().fill(isEnabled ?
+                    (configuration.isPressed ? Color(red: 0, green: 0.30, blue: 0.67) : Color(red: 0, green: 0.38, blue: 0.80)) :
+                    Color(nsColor: .controlBackgroundColor))
+            }
+            .overlay {
+                Capsule().strokeBorder(isEnabled ? Color.white.opacity(0.16) : Color.primary.opacity(0.12), lineWidth: 1)
+            }
+            .contentShape(Capsule())
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject var store: JobStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -284,10 +307,9 @@ struct ContentView: View {
                 Button { store.start() } label: {
                     Label(store.hasWaiting ? String(format: L("開始轉檔（%d）"), store.waitingCount) : L("開始轉檔"), systemImage: "arrow.right")
                 }
-                .buttonStyle(.borderedProminent).controlSize(.large)
+                .buttonStyle(PrimaryActionStyle())
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!store.hasWaiting || !toolsAvailable)
-                .opacity(!store.hasWaiting || !toolsAvailable ? 0.45 : 1)
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 16)
