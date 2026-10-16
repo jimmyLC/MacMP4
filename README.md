@@ -29,6 +29,7 @@ MacMP4 wraps a fast remux engine with a forgiving, auto-fallback pipeline into a
 - 🧯 **Damage-tolerant** — corrupt packets are skipped (`-err_detect ignore_err -fflags +discardcorrupt`) instead of aborting the conversion.
 - 🎛 **GPU acceleration** — the re-encode fallback uses Apple's **VideoToolbox** hardware encoder (`h264_videotoolbox`) by default, with automatic fallback to CPU x264 (CRF 18).
 - 📁 **Output next to the source** by default, or choose any folder.
+- 🌐 **Bilingual UI** — English / Traditional Chinese, follows the system language (in-app override available).
 - ⌨️ **CLI included** for scripting.
 
 ## Supported input formats

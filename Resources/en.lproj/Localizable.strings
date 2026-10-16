@@ -1,0 +1,69 @@
+/* MacMP4 — English localization
+   Keys are the Traditional Chinese source strings from the code:
+   see en.lproj note in AGENTS.md. */
+
+/* ---- ffmpeg banner ---- */
+"找不到 ffmpeg。請先開啟「終端機」執行:brew install ffmpeg" = "ffmpeg not found. Open Terminal and run: brew install ffmpeg";
+
+/* ---- drop zone ---- */
+"把影片檔(.ts / .m2ts / .mkv / .flv / .avi …)或整個資料夾拖進來" = "Drop video files (.ts / .m2ts / .mkv / .flv / .avi …) or whole folders here";
+"無損秒轉 MP4:不重編碼、不改解析度,壞檔自動修復" = "Lossless and instant: no re-encoding, no resolution changes, damaged files auto-repaired";
+
+/* ---- options ---- */
+"輸出到來源資料夾" = "Output to source folder";
+"選擇輸出資料夾…" = "Choose output folder…";
+"加入後自動開始" = "Auto start";
+"覆蓋已存在的 MP4" = "Overwrite existing MP4s";
+"失敗時自動重新編碼" = "Auto re-encode on failure";
+"無損轉換與修復音訊都失敗時,整檔重新編碼(較慢,但能救回檔案)" = "If lossless remux and audio repair both fail, re-encode the whole file (slower, but rescues the file)";
+"GPU 硬體加速" = "GPU acceleration";
+"重新編碼時使用 Apple VideoToolbox 硬體編碼器:快很多、省電。關閉則用 CPU x264(品質略佳、較慢)" = "Use Apple VideoToolbox when re-encoding: much faster, more power-efficient. Off = CPU x264 (slightly better quality, slower)";
+
+/* ---- language picker ---- */
+"語言" = "Language";
+"跟隨系統" = "System default";
+"語言已切換,重新開啟 App 後全部生效" = "Language switched — reopen the app to apply it everywhere";
+
+/* ---- buttons ---- */
+"加入檔案" = "Add Files";
+"加入資料夾" = "Add Folder";
+"清除已完成" = "Clear Finished";
+"停止" = "Stop";
+"開始轉換" = "Start";
+
+/* ---- open panels ---- */
+"選擇要轉成 MP4 的影片檔" = "Select video files to convert to MP4";
+"選擇包含影片的資料夾" = "Select a folder containing videos";
+"選擇 MP4 輸出位置" = "Choose MP4 output location";
+
+/* ---- row controls ---- */
+"在 Finder 中顯示" = "Show in Finder";
+"重試" = "Retry";
+"從清單移除" = "Remove from list";
+
+/* ---- job states ---- */
+"等待中" = "Waiting";
+"讀取中…" = "Reading…";
+"完成(%@ · %@)" = "Done (%@ · %@)";
+"失敗:%@" = "Failed: %@";
+"略過:%@" = "Skipped: %@";
+"輸出:" = "Output: ";
+"進度:%.1f%%" = "Progress: %.1f%%";
+
+/* ---- status messages ---- */
+"已是 MP4 格式" = "Already an MP4";
+"輸出檔已存在" = "Output already exists";
+"無法讀取檔案" = "Cannot read the file";
+"找不到影音串流" = "No audio or video stream found";
+"影片編碼 %@ 無法直接封裝成 MP4,可勾選「失敗時自動重新編碼」" = "Video codec %@ can’t be stored in an MP4 directly — enable “Auto re-encode on failure”.";
+"轉換失敗(來源檔可能損壞)" = "Conversion failed (the source file may be damaged)";
+"已忽略 %d 個不支援的檔案" = "Ignored %d unsupported file(s)";
+
+/* ---- strategy labels ---- */
+"無損轉換" = "Lossless remux";
+"修復音訊" = "Audio repair";
+"GPU 硬體編碼" = "GPU encoding";
+"重新編碼" = "Re-encode";
+
+/* ---- elapsed time ---- */
+"%.1f 秒" = "%.1f s";

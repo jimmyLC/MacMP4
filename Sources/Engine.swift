@@ -80,22 +80,22 @@ enum FF {
 
         if probe.hasVideo && vOK && aOK {
             // 最理想:影片+音訊都直接複製,零損失、極快(純 I/O,無需也無法用 GPU 加速)
-            list.append(Strategy(label: "無損轉換", args: maps + ["-c", "copy"]))
+            list.append(Strategy(label: L("無損轉換"), args: maps + ["-c", "copy"]))
         }
         if probe.hasVideo && vOK {
             // 音訊重編碼:修復損壞的 AAC 幀等問題(影片仍為複製)
-            list.append(Strategy(label: "修復音訊", args: maps + ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"]))
+            list.append(Strategy(label: L("修復音訊"), args: maps + ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"]))
         }
         if allowReencode {
             if hardwareAccel {
                 // GPU 硬體編碼:Apple VideoToolbox(媒體引擎),速度快、省電
-                list.append(Strategy(label: "GPU 硬體編碼", args: maps + [
+                list.append(Strategy(label: L("GPU 硬體編碼"), args: maps + [
                     "-c:v", "h264_videotoolbox", "-q:v", "65",
                     "-c:a", "aac", "-b:a", "192k",
                 ]))
             }
             // 最後手段:軟體重新編碼(同解析度、CRF18 高畫質;GPU 失敗時自動退回這裡)
-            list.append(Strategy(label: "重新編碼", args: maps + [
+            list.append(Strategy(label: L("重新編碼"), args: maps + [
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "192k",
             ]))
@@ -179,7 +179,7 @@ func formatDuration(_ seconds: Double) -> String {
 
 /// 耗時 → 未滿 60 秒顯示 "12.4 秒",超過顯示 "M:SS"
 func formatElapsed(_ seconds: Double) -> String {
-    if seconds < 60 { return String(format: "%.1f 秒", seconds) }
+    if seconds < 60 { return String(format: L("%.1f 秒"), seconds) }
     let s = Int(seconds.rounded())
     return String(format: "%d:%02d", s / 60, s % 60)
 }
@@ -190,3 +190,17 @@ let supportedVideoExtensions: Set<String> = [
     "wmv", "webm", "mpg", "mpeg", "vob", "rm", "rmvb", "ogv", "3gp", "3g2",
     "m4v", "mp4", "asf", "divx", "mxf", "dv", "dat",
 ]
+
+/// 取用本地化字串:程式碼以「繁體中文原文」作為 key,
+/// 英文翻譯位於 Resources/en.lproj/Localizable.strings。
+/// 可用 UserDefaults 的 "AppLanguage"("zh-Hant" / "en")覆寫系統語言。
+/// CLI 執行時 bundle 內沒有翻譯資源 → 直接回傳中文原文。
+func L(_ key: String) -> String {
+    var bundle = Bundle.main
+    if let code = UserDefaults.standard.string(forKey: "AppLanguage"),
+       let path = Bundle.main.path(forResource: code, ofType: "lproj"),
+       let b = Bundle(path: path) {
+        bundle = b
+    }
+    return bundle.localizedString(forKey: key, value: key, table: nil)
+}

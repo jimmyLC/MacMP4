@@ -56,7 +56,7 @@ struct ContentView: View {
     private var missingBanner: some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            Text("找不到 ffmpeg。請先開啟「終端機」執行:brew install ffmpeg")
+            Text(L("找不到 ffmpeg。請先開啟「終端機」執行:brew install ffmpeg"))
                 .font(.callout)
             Spacer()
         }
@@ -80,10 +80,10 @@ struct ContentView: View {
                 Image(systemName: dropTargeted ? "arrow.down.circle.fill" : "arrow.down.doc.fill")
                     .font(.system(size: empty ? 56 : 22))
                     .foregroundStyle(dropTargeted ? Color.accentColor : Color.secondary)
-                Text("把影片檔(.ts / .m2ts / .mkv / .flv / .avi …)或整個資料夾拖進來")
+                Text(L("把影片檔(.ts / .m2ts / .mkv / .flv / .avi …)或整個資料夾拖進來"))
                     .font(empty ? .title3 : .callout)
                     .multilineTextAlignment(.center)
-                Text("無損秒轉 MP4:不重編碼、不改解析度,壞檔自動修復")
+                Text(L("無損秒轉 MP4:不重編碼、不改解析度,壞檔自動修復"))
                     .font(empty ? .callout : .caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -117,8 +117,8 @@ struct ContentView: View {
     private var optionsBar: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
-                Toggle("輸出到來源資料夾", isOn: $store.outputToSource)
-                Button("選擇輸出資料夾…") { pickOutputDir() }
+                Toggle(L("輸出到來源資料夾"), isOn: $store.outputToSource)
+                Button(L("選擇輸出資料夾…")) { pickOutputDir() }
                     .disabled(store.outputToSource)
                 if !store.outputToSource, let dir = store.customOutputDir {
                     Text(dir.path)
@@ -129,16 +129,22 @@ struct ContentView: View {
                         .help(dir.path)
                 }
                 Spacer()
-                Toggle("加入後自動開始", isOn: $store.autoStart)
+                Picker(L("語言"), selection: $store.appLanguage) {
+                    Text(L("跟隨系統")).tag("system")
+                    Text("繁體中文").tag("zh-Hant")
+                    Text("English").tag("en")
+                }
+                .pickerStyle(.menu)
             }
             HStack(spacing: 12) {
-                Toggle("覆蓋已存在的 MP4", isOn: $store.overwrite)
-                Toggle("失敗時自動重新編碼", isOn: $store.allowReencode)
-                    .help("無損轉換與修復音訊都失敗時,整檔重新編碼(較慢,但能救回檔案)")
-                Toggle("GPU 硬體加速", isOn: $store.hardwareAccel)
+                Toggle(L("覆蓋已存在的 MP4"), isOn: $store.overwrite)
+                Toggle(L("失敗時自動重新編碼"), isOn: $store.allowReencode)
+                    .help(L("無損轉換與修復音訊都失敗時,整檔重新編碼(較慢,但能救回檔案)"))
+                Toggle(L("GPU 硬體加速"), isOn: $store.hardwareAccel)
                     .disabled(!store.allowReencode)
-                    .help("重新編碼時使用 Apple VideoToolbox 硬體編碼器:快很多、省電。關閉則用 CPU x264(品質略佳、較慢)")
+                    .help(L("重新編碼時使用 Apple VideoToolbox 硬體編碼器:快很多、省電。關閉則用 CPU x264(品質略佳、較慢)"))
                 Spacer()
+                Toggle(L("加入後自動開始"), isOn: $store.autoStart)
             }
         }
         .toggleStyle(.checkbox)
@@ -160,10 +166,10 @@ struct ContentView: View {
             }
             HStack(spacing: 10) {
                 Button { pickFiles() } label: {
-                    Label("加入檔案", systemImage: "plus")
+                    Label(L("加入檔案"), systemImage: "plus")
                 }
                 Button { pickFolder() } label: {
-                    Label("加入資料夾", systemImage: "folder.badge.plus")
+                    Label(L("加入資料夾"), systemImage: "folder.badge.plus")
                 }
                 Spacer()
                 if let msg = store.flashMessage {
@@ -171,16 +177,16 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-                Button("清除已完成") { store.clearFinished() }
+                Button(L("清除已完成")) { store.clearFinished() }
                     .disabled(store.jobs.isEmpty)
                 if store.isRunning {
                     Button { store.stop() } label: {
-                        Label("停止", systemImage: "stop.fill")
+                        Label(L("停止"), systemImage: "stop.fill")
                     }
                     .tint(.red)
                 } else {
                     Button { store.start() } label: {
-                        Label("開始轉換", systemImage: "play.fill")
+                        Label(L("開始轉換"), systemImage: "play.fill")
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!store.hasWaiting)
@@ -224,7 +230,7 @@ struct ContentView: View {
         panel.allowsMultipleSelection = true
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
-        panel.message = "選擇要轉成 MP4 的影片檔"
+        panel.message = L("選擇要轉成 MP4 的影片檔")
         if panel.runModal() == .OK {
             store.add(urls: panel.urls)
         }
@@ -235,7 +241,7 @@ struct ContentView: View {
         panel.allowsMultipleSelection = true
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
-        panel.message = "選擇包含影片的資料夾"
+        panel.message = L("選擇包含影片的資料夾")
         if panel.runModal() == .OK {
             store.add(urls: panel.urls)
         }
@@ -246,7 +252,7 @@ struct ContentView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
-        panel.message = "選擇 MP4 輸出位置"
+        panel.message = L("選擇 MP4 輸出位置")
         if panel.runModal() == .OK {
             store.customOutputDir = panel.urls.first
             store.outputToSource = false
@@ -314,15 +320,16 @@ struct JobRow: View {
         }
         let state: String
         switch job.status {
-        case .waiting: state = "等待中"
-        case .probing: state = "讀取中…"
+        case .waiting: state = L("等待中")
+        case .probing: state = L("讀取中…")
         case .converting(let pct, let speed, let label):
             let p = pct < 0 ? "" : String(format: " %.0f%%", pct)
             let s = speed.isEmpty ? "" : " · \(speed)"
             state = "\(label)…\(p)\(s)"
-        case .done(let strategy, let elapsed): state = "完成(\(strategy) · \(formatElapsed(elapsed)))"
-        case .failed(let msg): state = "失敗:\(msg)"
-        case .skipped(let msg): state = "略過:\(msg)"
+        case .done(let strategy, let elapsed):
+            state = String(format: L("完成(%@ · %@)"), strategy, formatElapsed(elapsed))
+        case .failed(let msg): state = String(format: L("失敗:%@"), msg)
+        case .skipped(let msg): state = String(format: L("略過:%@"), msg)
         }
         return sizeStr + durStr + " · " + state
     }
@@ -338,9 +345,9 @@ struct JobRow: View {
 
     private var tooltip: String {
         var lines = [job.url.path]
-        if let v = job.outURL { lines.append("輸出:" + v.path) }
+        if let v = job.outURL { lines.append(L("輸出:") + v.path) }
         if case .converting(let pct, _, _) = job.status, pct >= 0 {
-            lines.append(String(format: "進度:%.1f%%", pct))
+            lines.append(String(format: L("進度:%.1f%%"), pct))
         }
         return lines.joined(separator: "\n")
     }
@@ -353,14 +360,14 @@ struct JobRow: View {
                     Image(systemName: "folder")
                 }
                 .buttonStyle(.borderless)
-                .help("在 Finder 中顯示")
+                .help(L("在 Finder 中顯示"))
             }
             if case .failed = job.status {
                 Button { store.retry(job) } label: {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.borderless)
-                .help("重試")
+                .help(L("重試"))
             }
             if case .converting = job.status {
                 EmptyView()
@@ -370,7 +377,7 @@ struct JobRow: View {
                 }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
-                .help("從清單移除")
+                .help(L("從清單移除"))
             }
         }
         .controlSize(.small)

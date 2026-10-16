@@ -1,0 +1,4 @@
+/* MacMP4 — 繁體中文
+   程式碼中的 UI 字串即為中文原文(key = 中文原文),
+   查無翻譯時自動回退為 key 本身,故此檔僅作語系宣告之用。
+   英文翻譯請見 en.lproj/Localizable.strings */

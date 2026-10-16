@@ -42,6 +42,17 @@ final class JobStore: ObservableObject {
     @Published var hardwareAccel = true
     @Published var autoStart = true
     @Published var flashMessage: String?
+    @Published var appLanguage: String = UserDefaults.standard.string(forKey: "AppLanguage") ?? "system" {
+        didSet {
+            guard oldValue != appLanguage else { return }
+            if appLanguage == "system" {
+                UserDefaults.standard.removeObject(forKey: "AppLanguage")
+            } else {
+                UserDefaults.standard.set(appLanguage, forKey: "AppLanguage")
+            }
+            flash(L("語言已切換,重新開啟 App 後全部生效"))
+        }
+    }
 
     private var pending: [Job] = []
     private var pendingIDs = Set<UUID>()
@@ -123,7 +134,7 @@ final class JobStore: ObservableObject {
             $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending
         }
         if !newJobs.isEmpty { jobs.append(contentsOf: newJobs) }
-        if ignored > 0 { flash("已忽略 \(ignored) 個不支援的檔案") }
+        if ignored > 0 { flash(String(format: L("已忽略 %d 個不支援的檔案"), ignored)) }
         if autoStart { start() }
     }
 
@@ -228,7 +239,7 @@ final class JobStore: ObservableObject {
         let ext = job.url.pathExtension.lowercased()
 
         if ext == "mp4" || ext == "m4v" {
-            setStatus(job, .skipped("已是 MP4 格式"))
+            setStatus(job, .skipped(L("已是 MP4 格式")))
             return
         }
 
@@ -241,25 +252,25 @@ final class JobStore: ObservableObject {
         let outURL = outDir.appendingPathComponent(job.url.deletingPathExtension().lastPathComponent + ".mp4")
 
         if fm.fileExists(atPath: outURL.path) && !overwrite {
-            setStatus(job, .skipped("輸出檔已存在"))
+            setStatus(job, .skipped(L("輸出檔已存在")))
             return
         }
 
         let startTime = Date()
         setStatus(job, .probing)
         guard let probe = FF.probe(url: job.url, ffprobe: ffprobe) else {
-            setStatus(job, .failed("無法讀取檔案"))
+            setStatus(job, .failed(L("無法讀取檔案")))
             return
         }
         DispatchQueue.main.async { job.duration = probe.duration }
         guard probe.hasVideo || probe.hasAudio else {
-            setStatus(job, .failed("找不到影音串流"))
+            setStatus(job, .failed(L("找不到影音串流")))
             return
         }
 
         let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel)
         if strategies.isEmpty {
-            setStatus(job, .failed("影片編碼 \(probe.videoCodec ?? "?") 無法直接封裝成 MP4,可勾選「失敗時自動重新編碼」"))
+            setStatus(job, .failed(String(format: L("影片編碼 %@ 無法直接封裝成 MP4,可勾選「失敗時自動重新編碼」"), probe.videoCodec ?? "?")))
             return
         }
 
@@ -290,6 +301,6 @@ final class JobStore: ObservableObject {
             if stopRequested { setStatus(job, .waiting); return }
         }
 
-        setStatus(job, .failed("轉換失敗(來源檔可能損壞)"))
+        setStatus(job, .failed(L("轉換失敗(來源檔可能損壞)")))
     }
 }
