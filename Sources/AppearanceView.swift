@@ -21,17 +21,18 @@ extension AppAccess {
 }
 
 struct SuperThanksIcon: View {
+    var size: CGFloat = 24
     var body: some View {
         Image(systemName: "heart.fill")
             .resizable().scaledToFit()
             .overlay {
                 Text("$")
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .font(.system(size: size * 13 / 24, weight: .heavy, design: .rounded))
                     .blendMode(.destinationOut)
-                    .offset(y: -1)
+                    .offset(y: -size / 24)
             }
             .compositingGroup()
-            .frame(width: 24, height: 23)
+            .frame(width: size, height: size * 23 / 24)
             .accessibilityHidden(true)
     }
 }
