@@ -14,6 +14,53 @@ struct ProbeResult {
     }
 }
 
+/// Optional batch edit. Values describe how much to remove, not absolute end times.
+struct ClipTrim {
+    let start: Double
+    let end: Double
+
+    init(startText: String, endText: String) throws {
+        guard let start = Double(startText.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let end = Double(endText.trimmingCharacters(in: .whitespacesAndNewlines)),
+              start.isFinite, end.isFinite, start >= 0, end >= 0 else {
+            throw TrimError.invalidSeconds
+        }
+        guard start > 0 || end > 0 else { throw TrimError.emptyEdit }
+        self.start = start
+        self.end = end
+    }
+
+    func resolve(duration: Double?) throws -> ClipRange {
+        guard let duration, duration.isFinite, duration > 0 else { throw TrimError.unknownDuration }
+        let retained = duration - start - end
+        guard retained.isFinite, retained > 0 else { throw TrimError.tooLong }
+        return ClipRange(start: start, duration: retained)
+    }
+}
+
+struct ClipRange {
+    let start: Double
+    let duration: Double
+
+    func matches(_ output: ProbeResult) -> Bool {
+        guard let actual = output.duration else { return false }
+        // Allow video-frame and AAC packet rounding, but reject a full uncut file.
+        return output.isValidOutput && abs(actual - duration) <= 0.25
+    }
+}
+
+enum TrimError: LocalizedError {
+    case invalidSeconds, emptyEdit, unknownDuration, tooLong
+    var errorDescription: String? {
+        switch self {
+        case .invalidSeconds: return L("請輸入大於或等於 0 的秒數，可使用小數。")
+        case .emptyEdit: return L("請設定要剪掉的開頭或結尾秒數。")
+        case .unknownDuration: return L("無法確認影片長度，無法裁切此檔案。")
+        case .tooLong: return L("剪掉的總長度必須小於影片長度。")
+        }
+    }
+}
+
 struct Strategy {
     let label: String
     let args: [String]
@@ -120,7 +167,7 @@ enum FF {
     /// 執行 ffmpeg 轉換。progress: (百分比(-1=未知), 速度字串)
     /// didStart: 讓呼叫端拿到 Process 以便中途停止
     static func run(ffmpeg: String, input: URL, output: URL, strategy: Strategy,
-                    duration: Double?,
+                    duration: Double?, trim: ClipRange? = nil,
                     didStart: ((Process) -> Void)? = nil,
                     progress: @escaping (Double, String) -> Void) -> Bool {
         let p = Process()
@@ -128,8 +175,11 @@ enum FF {
 
         var args = ["-hide_banner", "-nostdin", "-y",
                     // 容錯:批次轉檔遇到零星壞封包不中斷,直接跳過
-                    "-err_detect", "ignore_err", "-fflags", "+discardcorrupt",
-                    "-i", input.path]
+                    "-err_detect", "ignore_err", "-fflags", "+discardcorrupt"]
+        args += ["-i", input.path]
+        // Output seeking decodes up to the cut. Unlike demuxer seeking, this also
+        // handles TS files with sparse/missing seek indexes and long GOPs.
+        if let trim { args += ["-ss", String(trim.start), "-t", String(trim.duration), "-map_chapters", "-1"] }
         args += strategy.args
         args += ["-movflags", "+faststart", "-progress", "pipe:1", "-nostats", output.path]
         p.arguments = args

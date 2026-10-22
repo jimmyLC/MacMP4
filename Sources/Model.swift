@@ -39,6 +39,16 @@ final class JobStore: ObservableObject {
     @Published var customOutputDir: URL?
     @Published var overwrite = false
     @Published var forceH264 = false
+    @Published var trimEnabled = false
+    @Published var trimStartText = "0"
+    @Published var trimEndText = "0"
+    private var activeTrim: ClipTrim?
+
+    var trimInputError: String? {
+        guard trimEnabled else { return nil }
+        do { _ = try ClipTrim(startText: trimStartText, endText: trimEndText); return nil }
+        catch { return error.localizedDescription }
+    }
     @Published var allowReencode = true
     @Published var hardwareAccel = true
     @Published var autoStart = false
@@ -167,6 +177,10 @@ final class JobStore: ObservableObject {
 
     func start() {
         guard ffmpeg != nil, ffprobe != nil else { return }
+        if !isRunning {
+            do { activeTrim = trimEnabled ? try ClipTrim(startText: trimStartText, endText: trimEndText) : nil }
+            catch { flash(error.localizedDescription); return }
+        }
         enqueueNew()
         if !isRunning, hasPending() {
             isRunning = true
@@ -280,8 +294,10 @@ final class JobStore: ObservableObject {
         guard let ffmpeg, let ffprobe else { return }
         let fm = FileManager.default
         let ext = job.url.pathExtension.lowercased()
+        let trim = activeTrim
+        let encodeH264 = forceH264 || trim != nil
 
-        if ext == "mp4" || ext == "m4v" {
+        if trim == nil && (ext == "mp4" || ext == "m4v") {
             setStatus(job, .skipped(L("已是 MP4 格式")))
             return
         }
@@ -292,7 +308,7 @@ final class JobStore: ObservableObject {
         } else {
             outDir = customOutputDir!
         }
-        let outURL = outDir.appendingPathComponent(job.url.deletingPathExtension().lastPathComponent + ".mp4")
+        let outURL = outDir.appendingPathComponent(job.url.deletingPathExtension().lastPathComponent + (trim == nil ? ".mp4" : "_trimmed.mp4"))
 
         if fm.fileExists(atPath: outURL.path) && !overwrite {
             setStatus(job, .skipped(L("輸出檔已存在")))
@@ -311,11 +327,14 @@ final class JobStore: ObservableObject {
             return
         }
 
-        if forceH264 && !probe.hasVideo {
+        if encodeH264 && !probe.hasVideo {
             setStatus(job, .failed(L("強制 H.264 需要來源包含影片串流。")))
             return
         }
-        let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel, forceH264: forceH264)
+        let range: ClipRange?
+        do { range = try trim?.resolve(duration: probe.duration) }
+        catch { setStatus(job, .failed(error.localizedDescription)); return }
+        let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel, forceH264: encodeH264)
         if strategies.isEmpty {
             setStatus(job, .failed(String(format: L("影片編碼 %@ 無法直接封裝成 MP4，請開啟「必要時重新編碼影片」。"), probe.videoCodec ?? "?")))
             return
@@ -334,7 +353,7 @@ final class JobStore: ObservableObject {
             setStatus(job, .converting(percent: probe.duration == nil ? -1 : 0, speed: "", label: strategy.label))
 
             let ok = FF.run(ffmpeg: ffmpeg, input: job.url, output: transaction.temporaryURL, strategy: strategy,
-                            duration: probe.duration,
+                            duration: range?.duration ?? probe.duration, trim: range,
                             didStart: { [weak self] p in
                                 self?.track(p)
                             },
@@ -345,7 +364,7 @@ final class JobStore: ObservableObject {
             procLock.lock(); currentProcess = nil; procLock.unlock()
 
             if stopRequested { setStatus(job, .waiting); return }
-            if ok, let outProbe = self.probe(transaction.temporaryURL, using: ffprobe), FF.outputIsValid(outProbe, forceH264: forceH264) {
+            if ok, let outProbe = self.probe(transaction.temporaryURL, using: ffprobe), FF.outputIsValid(outProbe, forceH264: encodeH264), range?.matches(outProbe) ?? true {
                 if stopRequested { setStatus(job, .waiting); return }
                 do { try transaction.commit() }
                 catch {

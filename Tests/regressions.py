@@ -94,6 +94,23 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
         print(result.stdout.strip(), flush=True)
     check('transaction regression suite', lambda: swift_regression('output-tests', [ROOT/'Tests/OutputRegression.swift'], []))
     check('GUI model regression suite', lambda: swift_regression('model-tests', [ROOT/'Sources/Model.swift', ROOT/'Tests/ModelRegression.swift'], [short, FFMPEG, FFPROBE, hevc]))
+    def trim_regression():
+        fixture = tmp/'trim.mp4'
+        made = run([FFMPEG, '-v', 'error', '-f', 'lavfi', '-i', 'color=red:size=64x64:rate=30:duration=2',
+                    '-f', 'lavfi', '-i', 'color=green:size=64x64:rate=30:duration=2',
+                    '-f', 'lavfi', '-i', 'color=blue:size=64x64:rate=30:duration=2',
+                    '-f', 'lavfi', '-i', 'sine=frequency=440:duration=6',
+                    '-filter_complex', '[0:v][1:v][2:v]concat=n=3:v=1:a=0[v]',
+                    '-map', '[v]', '-map', '3:a', '-c:v', 'libx264', '-g', '180', '-sc_threshold', '0', '-c:a', 'aac', fixture])
+        require(made.returncode == 0, made.stderr)
+        others = []
+        for ext in ['mkv', 'ts']:
+            target = tmp/('trim.'+ext)
+            made = run([FFMPEG, '-v', 'error', '-i', fixture, '-c', 'copy', target])
+            require(made.returncode == 0, made.stderr)
+            others.append(target)
+        swift_regression('trim-tests', [ROOT/'Sources/Model.swift', ROOT/'Tests/TrimRegression.swift'], [FFMPEG, FFPROBE, fixture, *others])
+    check('GUI trim regression suite', trim_regression)
     check('tool installer regression suite', lambda: swift_regression('tool-setup-tests', [ROOT/'Sources/Model.swift', ROOT/'Sources/ToolSetup.swift', ROOT/'Tests/ToolSetupRegression.swift'], []))
     check('appearance entitlement regression suite', lambda: swift_regression('appearance-tests', [ROOT/'Sources/AppAccess.swift', ROOT/'Tests/AppearanceRegression.swift'], []))
     def localization():
