@@ -251,3 +251,15 @@
 "感謝你的支持，你目前使用 Pro 版本。" = "Thank you for your support. You are using Pro.";
 
 "Pro 升級即將開放，目前尚未提供付款。" = "Pro upgrades are coming soon. Payment is not available yet.";
+
+/* Optional basic trimming */
+"裁切開頭／結尾" = "Trim start / end";
+"剪掉開頭" = "Remove from start";
+"剪掉結尾" = "Remove from end";
+"秒" = "sec";
+"秒數，可輸入小數，例如 1.5。" = "Seconds; decimals are supported, for example 1.5.";
+"套用至本次佇列，裁切後重新轉為 H.264 MP4。原始影片保留，另存為 _trimmed.mp4。" = "Applies to this queue. Re-encodes the trimmed video to H.264 MP4. Keeps originals and saves as _trimmed.mp4.";
+"請輸入大於或等於 0 的秒數，可使用小數。" = "Enter seconds of 0 or greater. Decimals are supported.";
+"請設定要剪掉的開頭或結尾秒數。" = "Set how many seconds to remove from the start or end.";
+"無法確認影片長度，無法裁切此檔案。" = "Cannot trim this file because its duration could not be determined.";
+"剪掉的總長度必須小於影片長度。" = "The total time removed must be shorter than the video.";

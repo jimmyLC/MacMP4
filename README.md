@@ -74,6 +74,12 @@ Options: output location, overwrite existing MP4s, automatic re-encode fallback,
 
 > Pro tip: right-click a `.ts` file in Finder → **Open With → MacMP4**.
 
+## Basic trimming (GUI, advanced option)
+
+Open **Advanced options → Trim start / end**, then enter seconds to remove from the start and/or end (decimals supported). The option is off by default and applies to every waiting file in the current batch. Set one side to 0 to keep that edge. The retained video is re-encoded as H.264/AAC MP4 using hardware acceleration with CPU fallback, even when ordinary re-encode fallback is off.
+
+Trimming also accepts MP4/M4V inputs. Outputs use `<basename>_trimmed.mp4` in the selected output location; source files stay intact. Existing trimmed outputs obey the overwrite option. Invalid numbers, unknown duration or cuts that remove the entire video are rejected. Progress uses the retained duration. Turn trimming off to return to the original fast remux flow and MP4/M4V skip behavior. This option is available in Free and Pro; the CLI remains unchanged.
+
 ## Usage — CLI
 
 ```bash

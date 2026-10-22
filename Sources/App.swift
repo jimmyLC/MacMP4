@@ -238,11 +238,25 @@ struct ContentView: View {
             Button(L("或加入整個資料夾"), action: pickFolder)
                 .buttonStyle(.link).font(.callout)
             Spacer(minLength: 24)
-            Text(store.forceH264 ? L("強制輸出 H.264，原始影片會保留。") : L("優先無損轉換，原始影片會保留。"))
+            Text((store.forceH264 || store.trimEnabled) ? L("強制輸出 H.264，原始影片會保留。") : L("優先無損轉換，原始影片會保留。"))
                 .font(.caption).foregroundStyle(.secondary).padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private func trimField(_ title: String, text: Binding<String>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField("0", text: text)
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 72)
+                .accessibilityLabel(title)
+                .help(L("秒數，可輸入小數，例如 1.5。"))
+            Text(L("秒")).foregroundStyle(.secondary)
+        }
     }
 
     private var inspector: some View {
@@ -258,7 +272,7 @@ struct ContentView: View {
                         .background(Color.blue.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(L("相容常見播放器")).font(.callout).fontWeight(.medium)
-                        Text(store.forceH264 ? L("H.264 影片與 AAC 音訊") : L("優先保留原始畫質")).font(.caption).foregroundStyle(.secondary)
+                        Text((store.forceH264 || store.trimEnabled) ? L("H.264 影片與 AAC 音訊") : L("優先保留原始畫質")).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Divider()
@@ -287,18 +301,33 @@ struct ContentView: View {
                 Divider()
                 DisclosureGroup(L("進階選項"), isExpanded: $advancedExpanded) {
                     VStack(alignment: .leading, spacing: 14) {
+                        Toggle(L("裁切開頭／結尾"), isOn: $store.trimEnabled)
+                        if store.trimEnabled {
+                            VStack(alignment: .leading, spacing: 10) {
+                                trimField(L("剪掉開頭"), text: $store.trimStartText)
+                                trimField(L("剪掉結尾"), text: $store.trimEndText)
+                                Text(L("套用至本次佇列，裁切後重新轉為 H.264 MP4。原始影片保留，另存為 _trimmed.mp4。"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let error = store.trimInputError {
+                                    Text(error).font(.caption).foregroundStyle(.red)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
                         Toggle(L("允許覆蓋既有 MP4"), isOn: $store.overwrite)
                         Toggle(L("強制 H.264"), isOn: $store.forceH264)
+                            .disabled(store.trimEnabled)
                         if store.forceH264 {
                             Text(L("輸出 H.264 影片與 AAC 音訊。"))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Toggle(L("必要時重新編碼影片"), isOn: $store.allowReencode)
-                            .disabled(store.forceH264)
+                            .disabled(store.forceH264 || store.trimEnabled)
                         Text(L("音訊修復會自動嘗試。"))
                             .font(.caption).foregroundStyle(.secondary)
                         Toggle(L("使用硬體加速"), isOn: $store.hardwareAccel)
-                            .disabled(!store.allowReencode && !store.forceH264)
+                            .disabled(!store.allowReencode && !store.forceH264 && !store.trimEnabled)
                         Text(L("僅在重新編碼時使用。"))
                             .font(.caption).foregroundStyle(.secondary)
                     }.toggleStyle(.checkbox).padding(.top, 12)
@@ -393,7 +422,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(PrimaryActionStyle())
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!store.hasWaiting || !toolsAvailable)
+                .disabled(!store.hasWaiting || !toolsAvailable || store.trimInputError != nil)
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 16)
