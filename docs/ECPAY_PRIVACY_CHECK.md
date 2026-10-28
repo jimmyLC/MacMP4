@@ -2,13 +2,13 @@
 
 - 日期：2026-10-28
 - 範圍：`codex/ecpay-pro` 新增付款 Worker／D1、原生授權與鑰匙圈；不含既有網站改版。
-- 狀態：本機驗證完成，尚未建立或部署雲端服務；正式收款關閉。
+- 狀態：測試與正式 Worker／D1 已部署；正式收款已啟用供擁有者驗收，尚未公開發行 App。
 
 ## 1. 結論
 
-**本機開發驗證通過；正式收款 no-go，直到下列部署及實測條件完成。**
+**綠界測試環境端到端驗證通過；全面公開販售仍待正式付款驗收、備援與監控。**
 
-Blocker（上線條件）：3；程式層 high：目前測試範圍未發現；營運待辦：監控／備份金鑰。
+待完成上線條件：2；程式層 high：目前測試範圍未發現；營運待辦：監控／備份金鑰。
 
 ## 2. 個資資料地圖
 
@@ -20,29 +20,27 @@ Blocker（上線條件）：3；程式層 high：目前測試範圍未發現；�
 | IP 限流桶 | Worker CF-Connecting-IP | D1 HMAC 雜湊 | 最多兩天 | 每分鐘桶，每天清理；不保存原始 IP | Cloudflare 另有基礎連線處理 |
 | 卡片與 Apple Pay 資料 | 綠界託管頁 | 綠界與其處理者 | 付款 | 不進 App／本服務資料表 | 綠界 |
 | 影片檔案 | 原有本機轉檔 | 使用者電腦 | 本機轉檔／裁切 | 新金流 API 不接收媒體 | 無新增第三方傳輸 |
-| 正式金流／AES／查找／簽章密鑰 | 本機設定；核准後上傳 | .dev.vars.production（600）、Worker secrets | 驗簽、加密及授權 | 不進 Resources／Git；不同用途獨立金鑰 | 核准後僅 Cloudflare |
+| 正式金流／AES／查找／簽章密鑰 | 本機設定，已分環境上傳 | .dev.vars.production（600）、Worker secrets | 驗簽、加密及授權 | 不進 Resources／Git；不同用途獨立金鑰 | Cloudflare |
 
 ## 3. Findings 與上線條件
 
-### B-1：正式雲端、綠界回呼尚未實測
+### 已完成：獨立雲端及綠界測試回呼
 
-- 位置：`payments/wrangler.jsonc` 的 database_id 仍為佔位符、CHECKOUT_ENABLED=false；`Resources/ProConfiguration.json` disabled。
-- 影響：目前無正式收款能力，不能把本機 workerd 模擬宣稱為綠界端到端成功。
-- 驗證：本機 `/v1/orders`→簽章 callback→paid→activate 已使用原生 workerd＋D1 跑通；公開 origin 尚不存在。
-- 修法：核准後建 staging/prod；先完成綠界 stage 交易及 ReturnURL 實測，再開正式服務。
+- 測試及正式環境各有獨立 Worker、D1 與密鑰；正式付款已開啟供擁有者驗收。
+- 使用綠界測試交易實際收到 ReturnURL，原生程式驗簽並顯示 Pro；正式端拒絕無效簽章。Apple Pay 錢包及正式交易尚未實測。
 
 ### B-2：正式儲存還原與密鑰備援待完成
 
 - 位置：`payments/migrations/0001_orders.sql`、`payments/scripts/prepare-config.mjs`、.dev.vars.production。
 - 影響：遺失資料或 DATA_KEY／LOOKUP_KEY／簽章私鑰會影響恢復、解密或舊 App 相容性。
-- 驗證：原生 workerd 本機 D1 SQLite 使用 online backup 匯出 SQL，再還原至隔離記憶體資料庫，已付款合成訂單 count=1；尚未測試正式 D1 的 export/Time Travel。
-- 修法：部署後驗證 D1 正式備份／恢復到獨立測試資料庫；使用者另以密碼管理器或加密異地備份保管密鑰。不能把同一磁碟的複本當異地備援。
+- 驗證：原生 workerd 本機 D1 SQLite 使用 online backup 匯出 SQL，再還原至隔離記憶體資料庫，已付款合成訂單 count=1；雲端 staging 與正式 D1 均已匯出並在隔離的本機 SQLite 還原；已查詢正式 D1 Time Travel bookmark，尚未執行雲端還原。
+- 修法：驗證 D1 恢復到獨立雲端測試資料庫；使用者另以密碼管理器或加密異地備份保管密鑰。不能把同一磁碟的複本當異地備援。
 
 ### B-3：正式付款及 Apple Pay 完整流程待使用者驗收
 
 - 位置：`Sources/AppearanceView.swift` 的超級感謝視窗；`payments/src/worker.mjs` checkout/notify。
 - 影響：僅格式檢查無法證明商店金鑰與合約實際有效；目前沒有真的刷卡。
-- 修法：stage 先用官方測試卡；正式小額驗收由使用者本人確認付款，不由代理執行付款。
+- 修法：stage 已使用官方測試卡；正式小額驗收由使用者本人確認付款，不由代理執行付款。
 
 ### 營運與殘餘風險
 
@@ -81,8 +79,8 @@ Blocker（上線條件）：3；程式層 high：目前測試範圍未發現；�
 |---|---|---|
 | 本機程式／回歸 | 程式 | 通過 |
 | 正式金鑰輸入與 600 權限 | 使用者＋程式 | 已設定，僅檢查存在／格式，未顯示值 |
-| 建立 Worker／D1、上傳密鑰、部署 | 使用者核准後程式執行 | 待核准 |
-| 綠界 stage 實測 | 程式／必要時使用者處理驗證 | 待部署 |
+| 建立 Worker／D1、上傳密鑰、部署 | 使用者核准後程式執行 | 已完成 |
+| 綠界 stage 實測 | 程式／必要時使用者處理驗證 | 已完成，實際測試回呼與原生授權通過 |
 | 正式付款確認 | 使用者本人 | 尚未執行 |
 | 正式異地密鑰備份、D1 還原、錯誤通知 | 開發者＋程式 | 待完成 |
 | main／公開 DMG／既有網站更新 | 使用者另行核准 | 未執行 |

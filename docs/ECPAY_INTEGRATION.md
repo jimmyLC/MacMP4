@@ -20,8 +20,8 @@ Pro 是 NT$90 終身買斷，只增加 Pro 標誌、淺色／深色／跟隨系�
 ## 架構與資料
 
 - `payments/`：獨立 Cloudflare Worker＋D1，沒有靜態 assets 路由，也不修改 `jimmy-tools-site`。
-- 預定測試主機：`https://macmp4-payments-staging.acsd68500.workers.dev`
-- 預定正式主機：`https://macmp4-payments.acsd68500.workers.dev`
+- 測試主機：`https://macmp4-payments-staging.acsd68500.workers.dev`
+- 正式主機：`https://macmp4-payments.acsd68500.workers.dev`
 - 金流回呼直接進 Worker 原生 origin，不經既有網站的 CDN／靜態資源快取。須實測綠界可送達，必要時改用可公開接收的獨立 origin；不可用快取頁面或驗證碼挑戰包住 ReturnURL。
 - 價格／產品固定於伺服器，無裝置數限制（使用者未指定）；持有 Email＋序號者可恢復。
 - Email 與序號使用獨立 AES-GCM DATA_KEY 加密；Email 查找為 LOOKUP_KEY 的 HMAC，序號為高熵隨機值的 SHA256。權杖僅保存 SHA256。綠界交易編號與本地訂單關聯保存。
@@ -59,6 +59,12 @@ npm test
 ```
 
 prepare-config 保留已存在的私鑰，不自動輪替，收款保持關閉；公開設定另寫入 `ProConfiguration.<env>.public.json`。備份 DATA_KEY、LOOKUP_KEY、LICENSE_SIGNING_JWK 與 D1；失去它們可能失去查找、解密或舊 App 的驗證相容性。
+
+## 目前部署與驗收狀態
+
+2026-10-28 已建立獨立 staging／production Worker 與 D1，並分別設定 secrets。綠界測試頁交易已完成實際回呼，原生客戶端驗簽並啟用 Pro。正式環境已啟用 NT$90 收款供擁有者親自驗收，正式付款與 Apple Pay 尚未實測。現有網站、公開 DMG 及 main 均未更新。
+
+雲端 D1 匯出已於隔離的本機 SQLite 還原；獨立雲端還原演練、異地加密金鑰備份與錯誤通知仍待完成。全面公開販售前應完成這些項目和正式付款驗收。
 
 ## 核准後的部署順序
 

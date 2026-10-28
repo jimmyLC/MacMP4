@@ -8,24 +8,24 @@
   "observability": { "enabled": false },
   "vars": {
     "PAYMENT_ENV": "staging",
-    "CHECKOUT_ENABLED": "false",
-    "APPLE_PAY_ENABLED": "false",
+    "CHECKOUT_ENABLED": "true",
+    "APPLE_PAY_ENABLED": "true",
     "PUBLIC_BASE_URL": "https://macmp4-payments-staging.acsd68500.workers.dev",
     "CALLBACK_BASE_URL": "https://macmp4-payments-staging.acsd68500.workers.dev"
   },
-  "d1_databases": [{ "binding": "DB", "database_name": "macmp4-payments-staging", "database_id": "CONFIGURE-STAGING-DATABASE", "migrations_dir": "migrations" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "macmp4-payments-staging", "database_id": "be7a2640-b323-4880-944c-be4b95a321a2", "migrations_dir": "migrations" }],
   "triggers": { "crons": ["17 20 * * *"] },
   "env": {
     "production": {
       "name": "macmp4-payments",
       "vars": {
         "PAYMENT_ENV": "production",
-        "CHECKOUT_ENABLED": "false",
-        "APPLE_PAY_ENABLED": "false",
+        "CHECKOUT_ENABLED": "true",
+        "APPLE_PAY_ENABLED": "true",
         "PUBLIC_BASE_URL": "https://macmp4-payments.acsd68500.workers.dev",
         "CALLBACK_BASE_URL": "https://macmp4-payments.acsd68500.workers.dev"
       },
-      "d1_databases": [{ "binding": "DB", "database_name": "macmp4-payments", "database_id": "CONFIGURE-PRODUCTION-DATABASE", "migrations_dir": "migrations" }],
+      "d1_databases": [{ "binding": "DB", "database_name": "macmp4-payments", "database_id": "44752ecb-6dee-4f83-93d6-233aff04df86", "migrations_dir": "migrations" }],
       "triggers": { "crons": ["17 20 * * *"] }
     }
   }
