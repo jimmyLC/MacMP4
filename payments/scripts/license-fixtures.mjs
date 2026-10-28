@@ -1,0 +1,10 @@
+import {writeFile} from 'node:fs/promises';
+import {base64url,bytes,signLicense} from '../src/crypto.mjs';
+const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+const jwk=JSON.stringify(await crypto.subtle.exportKey('jwk',pair.privateKey));
+const order={id:'M1234567890123456789',environment:'production',paid_at:Math.floor(Date.now()/1000)};
+const token=await signLicense(order,'buyer@example.com',jwk);
+const stage=await signLicense({...order,environment:'staging'},'buyer@example.com',jwk);
+const future=await signLicense({...order,paid_at:order.paid_at+3600},'buyer@example.com',jwk);
+const publicKey=Buffer.from(await crypto.subtle.exportKey('raw',pair.publicKey)).toString('base64');
+await writeFile(process.argv[2],JSON.stringify({publicKey,token,stage,future}),{mode:0o600});

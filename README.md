@@ -159,3 +159,7 @@ Free displays a Free badge and always uses Light appearance. Pro displays a Pro 
 The Advanced options include **Force H.264**, off by default and available in both Free and Pro. When enabled, conversion skips stream-copy strategies and uses H.264 video plus AAC audio (if the source has audio), with VideoToolbox and CPU fallback. This takes precedence over the normal re-encode fallback setting. The CLI equivalent is `--force-h264`; it cannot be combined with `--no-reencode`. Existing MP4/M4V and no-overwrite skip rules are unchanged.
 
 The support entry is **Super Thanks**, with a heart-and-dollar icon. The panel describes the NT$90 lifetime Pro edition; checkout is not available yet.
+
+## Pro payment integration (development)
+
+An ECPay checkout and signed lifetime license flow is implemented on `codex/ecpay-pro`, with a separate Worker/D1 backend. Production checkout remains disabled until credentials, staging callbacks and deployment are verified. Pro costs NT$90 once; conversion remains free. This store currently accepts Taiwan-issued credit cards only. See [integration and release gates](docs/ECPAY_INTEGRATION.md).

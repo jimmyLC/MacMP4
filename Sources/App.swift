@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct MacMP4App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = JobStore.shared
+    @StateObject private var license = ProLicenseStore()
     @State private var showingAbout = false
     #if MACMP4_PREVIEW_PRO
     @StateObject private var access = AppAccess(tier: .pro)
@@ -16,9 +17,16 @@ struct MacMP4App: App {
     var body: some Scene {
         WindowGroup("MacMP4") {
             ContentView(showingAbout: $showingAbout)
-                .environmentObject(store).environmentObject(access)
+                .environmentObject(store).environmentObject(access).environmentObject(license)
                 .preferredColorScheme(access.preferredColorScheme)
                 .onAppear { access.applyNativeAppearance() }
+                .task {
+                    await license.resume(access: access)
+                    while !Task.isCancelled {
+                        do { try await Task.sleep(nanoseconds: 10_000_000_000) } catch { return }
+                        if license.hasRecoverablePurchases { await license.checkPayment() }
+                    }
+                }
                 .onChange(of: access.effectiveAppearance) { _ in access.applyNativeAppearance() }
                 .id(store.appLanguage)
         }

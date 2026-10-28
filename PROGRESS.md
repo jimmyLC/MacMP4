@@ -30,3 +30,7 @@ Last updated: 2026-10-27
 - Default import flow is add, review, then start; immediate conversion is opt-in.
 - Developer previews of Pro compile with `-D MACMP4_PREVIEW_PRO`; `build.sh` never sets it.
 - License changed from MIT to Noncommercial; rights already granted under earlier MIT releases are unaffected.
+
+## ECPay integration work — 2026-10-28
+
+On `codex/ecpay-pro`: implemented a separate Worker/D1 payment service, NT$90 fixed-price Apple Pay/card orders, verified/idempotent callbacks, encrypted license storage, P-256 signed lifetime receipts, native checkout/polling, Keychain recovery and email+serial restoration. Taiwan-issued-card limitation is displayed on both payment surfaces. Local Worker/D1 smoke, backend tests, native client security tests and existing regressions pass. Credentials are privately configured; cloud deployment, actual ECPay callbacks, production payment acceptance and public app release remain pending. Checkout is disabled by default. See `docs/ECPAY_INTEGRATION.md` and `docs/ECPAY_PRIVACY_CHECK.md` for evidence and release gates.

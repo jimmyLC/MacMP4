@@ -1,0 +1,12 @@
+{
+  "name": "macmp4-payments",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "dev": "wrangler dev --config wrangler.jsonc",
+    "deploy": "wrangler deploy --config wrangler.jsonc"
+  },
+  "devDependencies": { "wrangler": "4.147.0" },
+  "engines": { "node": ">=22.13" }
+}

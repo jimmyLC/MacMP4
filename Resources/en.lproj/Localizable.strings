@@ -263,3 +263,35 @@
 "請設定要剪掉的開頭或結尾秒數。" = "Set how many seconds to remove from the start or end.";
 "無法確認影片長度，無法裁切此檔案。" = "Cannot trim this file because its duration could not be determined.";
 "剪掉的總長度必須小於影片長度。" = "The total time removed must be shorter than the video.";
+
+/* 綠界付款與 Pro 授權 */
+"Pro 序號" = "Pro serial number";
+"付款完成後會自動啟用 Pro，可關閉此視窗繼續轉檔。" = "Pro activates automatically after payment. You can close this window and keep converting.";
+"付款方式" = "Payment method";
+"付款服務尚未設定完成，請稍後再試。" = "Payments are not configured yet. Please try again later.";
+"付款連結已過期，請聯絡客服協助處理訂單。" = "The payment link has expired. Please contact support for help with this order.";
+"信用卡" = "Credit card";
+"包含 Pro 標誌、深色外觀與跟隨系統自動切換。" = "Includes the Pro badge, Dark appearance and automatic System appearance.";
+"啟用 Pro" = "Activate Pro";
+"尚未收到付款確認，可稍後再檢查。" = "Payment confirmation has not arrived yet. Please check again shortly.";
+"已有序號？恢復 Pro" = "Have a serial number? Restore Pro";
+"操作太頻繁，請稍後再試。" = "Too many attempts. Please try again shortly.";
+"本商店僅支援台灣發行的信用卡，暫不支援海外發行信用卡。" = "This store accepts Taiwan-issued credit cards only. Cards issued overseas are not supported.";
+"檢查付款" = "Check payment";
+"此授權已停用，請聯絡客服。" = "This license has been revoked. Please contact support.";
+"深色與跟隨系統是 Pro 功能。請開啟「超級感謝」購買或輸入序號啟用；轉檔功能維持免費。" = "Dark and System appearance are Pro features. Open Super Thanks to purchase or activate a serial number. Conversion remains free.";
+"無法將授權資料儲存至鑰匙圈，請確認鑰匙圈已解鎖。" = "Could not save license details to Keychain. Make sure it is unlocked.";
+"無法開啟瀏覽器，請按「重新開啟付款頁」重試。" = "Could not open the browser. Try Reopen checkout.";
+"無法驗證授權，請確認 Email 與序號。" = "Could not verify the license. Check your email and serial number.";
+"目前無法連線至付款服務，請稍後再試。" = "Cannot connect to the payment service. Please try again later.";
+"請保存 Email 與序號，重新安裝時可恢復 Pro。" = "Keep your email and serial number to restore Pro after reinstalling.";
+"請輸入有效的 Email。" = "Enter a valid email address.";
+"購買 Email" = "Purchase email";
+"超級感謝 · NT$90" = "Super Thanks · NT$90";
+"超級感謝 · 啟用 Pro" = "Super Thanks · Activate Pro";
+"超級感謝！Pro 已啟用。" = "Super Thanks! Pro is now active.";
+"返回購買" = "Back to purchase";
+"重新開啟付款頁" = "Reopen checkout";
+"隱私說明" = "Privacy notice";
+"重新建立訂單" = "Create a new order";
+"未完成訂單較多，請聯絡客服協助確認付款。" = "There are several unfinished orders. Contact support to check your payment.";
