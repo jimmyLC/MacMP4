@@ -4,7 +4,10 @@ Last updated: 2026-10-28
 
 ## Current state
 
-- **Version 1.0.0** (see `VERSION`). Apple Silicon DMG published as [GitHub Release v1](https://github.com/jimmyLC/MacMP4/releases/tag/v1); ad-hoc signed, **not** Developer ID signed or notarized.
+- **Version 1.1.1** (see `VERSION`; GitHub Release `v1.1.1`, linked from the product page). v1.1.0 and v1 remain published.
+- Pro purchase (NT$90 lifetime, Apple Pay / Taiwan credit card via ECPay) is live in production; the payment Worker/D1 is under `payments/`. Still open before wide promotion: owner-verified real payment, off-site backup of DATA_KEY / LOOKUP_KEY / signing key, D1 restore drill, error monitoring.
+- In-app Report a Problem (Help menu; also after a file fails twice) opens support.jimmy-tools.com with redacted diagnostics.
+- Previous version note: Apple Silicon DMG published as [GitHub Release v1](https://github.com/jimmyLC/MacMP4/releases/tag/v1); ad-hoc signed, **not** Developer ID signed or notarized.
 - Product page and download: https://jimmy-tools.com/MacMP4/ (maintained in the `jimmy-tools-site` repo).
 - Features shipped:
   - Lossless remux with the automatic repair chain (lossless copy, audio repair, GPU re-encode, CPU re-encode)
