@@ -92,12 +92,10 @@ struct ModelRegression {
         precondition(failureLog.count <= ReportProblem.maxLogCharacters, "failure log is not bounded")
         // Each failed attempt counts, including retries, until the report button is offered.
         precondition(reported.jobs[0].failureCount == 1 && !ReportProblem.isOffered(failures: reported.jobs[0].failureCount), "first failure should not offer a report")
-        for expected in [2, 3] {
-            reported.retry(reported.jobs[0])
-            wait { if case .failed = reported.jobs[0].status, !reported.isRunning { return true }; return false }
-            precondition(reported.jobs[0].failureCount == expected, "retry failure not counted: \(reported.jobs[0].failureCount)")
-        }
-        precondition(ReportProblem.isOffered(failures: reported.jobs[0].failureCount), "report not offered after two failed retries")
+        reported.retry(reported.jobs[0])
+        wait { if case .failed = reported.jobs[0].status, !reported.isRunning { return true }; return false }
+        precondition(reported.jobs[0].failureCount == 2, "retry failure not counted: \(reported.jobs[0].failureCount)")
+        precondition(ReportProblem.isOffered(failures: reported.jobs[0].failureCount), "report not offered after a failed retry")
         try fm.removeItem(at: output)
         try fm.createDirectory(at: output, withIntermediateDirectories: false)
         let sentinel = output.appendingPathComponent("sentinel")

@@ -13,8 +13,8 @@ enum ReportProblem {
     static let maxLogCharacters = 4000
 
     /// The report button appears on a failed file only after it has failed this many times,
-    /// that is the first attempt plus two retries. A one-off failure is usually fixed by trying again.
-    static let failuresBeforeOffering = 3
+    /// that is the first attempt plus one retry. A one-off failure is usually fixed by trying again.
+    static let failuresBeforeOffering = 2
 
     static func isOffered(failures: Int) -> Bool { failures >= failuresBeforeOffering }
 
