@@ -176,7 +176,8 @@ enum FF {
     static func run(ffmpeg: String, input: URL, output: URL, strategy: Strategy,
                     duration: Double?, trim: ClipRange? = nil,
                     didStart: ((Process) -> Void)? = nil,
-                    progress: @escaping (Double, String) -> Void) -> Bool {
+                    progress: @escaping (Double, String) -> Void,
+                    errorOutput: ((String) -> Void)? = nil) -> Bool {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: ffmpeg)
 
@@ -198,6 +199,9 @@ enum FF {
 
         var buffer = Data()
         var lastSpeed = ""
+        // ffmpeg reports the reason for a failure at the end of stderr; keep only the last 16 KB.
+        var errorTail = Data()
+        let errorTailLimit = 16 * 1024
 
         outPipe.fileHandleForReading.readabilityHandler = { fh in
             let d = fh.availableData
@@ -226,7 +230,9 @@ enum FF {
         }
         errPipe.fileHandleForReading.readabilityHandler = { fh in
             let d = fh.availableData   // 排空 stderr,避免 ffmpeg 卡住
-            if d.isEmpty { fh.readabilityHandler = nil }
+            if d.isEmpty { fh.readabilityHandler = nil; return }
+            errorTail.append(d)
+            if errorTail.count > errorTailLimit { errorTail = errorTail.suffix(errorTailLimit) }
         }
 
         do { try p.run() } catch { return false }
@@ -235,7 +241,8 @@ enum FF {
         outPipe.fileHandleForReading.readabilityHandler = nil
         errPipe.fileHandleForReading.readabilityHandler = nil
         _ = outPipe.fileHandleForReading.readDataToEndOfFile()
-        _ = errPipe.fileHandleForReading.readDataToEndOfFile()
+        errorTail.append(errPipe.fileHandleForReading.readDataToEndOfFile())
+        errorOutput?(String(decoding: errorTail.suffix(errorTailLimit), as: UTF8.self))
         return p.terminationStatus == 0
     }
 }

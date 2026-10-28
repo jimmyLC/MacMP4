@@ -79,6 +79,17 @@ struct ModelRegression {
         let afterFailure = try Data(contentsOf: output)
         precondition(afterFailure == original, "invalid output replaced original")
         guard case .failed = invalid.jobs[0].status else { fatalError("invalid output accepted") }
+        precondition(invalid.jobs[0].failureLog.contains("source:"), "failed job has no diagnostics for the report form")
+        let noisyFail = root.appendingPathComponent("noisy-fail")
+        try "#!/bin/sh\necho 'Error: Invalid data found when processing input /Users/amy/secret.ts' >&2\nexit 1\n".write(to: noisyFail, atomically: true, encoding: .utf8)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: noisyFail.path)
+        let reported = store(noisyFail.path, ffprobe)
+        reported.add(urls: [input]); reported.start(); wait { !reported.isRunning }
+        guard case .failed = reported.jobs[0].status else { fatalError("failing encoder should fail the job") }
+        let failureLog = reported.jobs[0].failureLog
+        precondition(failureLog.contains("Invalid data found when processing input"), "ffmpeg's error is missing from the failure log: \(failureLog)")
+        precondition(!failureLog.contains("amy") && !failureLog.contains(root.path), "failure log leaks a path: \(failureLog)")
+        precondition(failureLog.count <= ReportProblem.maxLogCharacters, "failure log is not bounded")
         try fm.removeItem(at: output)
         try fm.createDirectory(at: output, withIntermediateDirectories: false)
         let sentinel = output.appendingPathComponent("sentinel")

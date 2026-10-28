@@ -74,6 +74,12 @@ Options: output location, overwrite existing MP4s, automatic re-encode fallback,
 
 > Pro tip: right-click a `.ts` file in Finder → **Open With → MacMP4**.
 
+## Report a problem (GUI)
+
+A failed file shows a **Report a Problem** button next to Retry, and the same command is under **Help → Report a Problem…**. It opens https://support.jimmy-tools.com in your browser with the app version, macOS version, ffmpeg version and the tail of ffmpeg's error output already filled in. File names, folder names, volume names and email addresses are removed from that log before the link is built.
+
+The diagnostics travel in the URL fragment (`#d=…`), which a browser never sends to a server. Nothing leaves your Mac until you read the form and press Send, and you can switch the diagnostics off there. Video files are never uploaded.
+
 ## Basic trimming (GUI, advanced option)
 
 Open **Advanced options → Trim start / end**, then enter seconds to remove from the start and/or end (decimals supported). The option is off by default and applies to every waiting file in the current batch. Set one side to 0 to keep that edge. The retained video is re-encoded as H.264/AAC MP4 using hardware acceleration with CPU fallback, even when ordinary re-encode fallback is off.

@@ -300,3 +300,8 @@
 "恭喜升級 Pro" = "Welcome to Pro!";
 "謝謝你的支持！Pro 功能已啟用。" = "Thank you for your support! Pro is now active.";
 "太棒了" = "Great!";
+
+/* ---- report a problem ---- */
+"回報問題…" = "Report a Problem…";
+"回報問題" = "Report a Problem";
+"開啟回報表單。會附上版本與這支影片的錯誤紀錄（已遮蔽檔名與路徑），送出前可以檢視。" = "Opens the report form with the app version and this video's error log (file names and paths removed). You can review everything before sending.";

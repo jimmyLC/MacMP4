@@ -93,7 +93,7 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
         require(result.returncode == 0, result.stdout + result.stderr)
         print(result.stdout.strip(), flush=True)
     check('transaction regression suite', lambda: swift_regression('output-tests', [ROOT/'Tests/OutputRegression.swift'], []))
-    check('GUI model regression suite', lambda: swift_regression('model-tests', [ROOT/'Sources/Model.swift', ROOT/'Tests/ModelRegression.swift'], [short, FFMPEG, FFPROBE, hevc]))
+    check('GUI model regression suite', lambda: swift_regression('model-tests', [ROOT/'Sources/Model.swift', ROOT/'Sources/ReportProblem.swift', ROOT/'Tests/ModelRegression.swift'], [short, FFMPEG, FFPROBE, hevc]))
     def trim_regression():
         fixture = tmp/'trim.mp4'
         made = run([FFMPEG, '-v', 'error', '-f', 'lavfi', '-i', 'color=red:size=64x64:rate=30:duration=2',
@@ -109,9 +109,10 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
             made = run([FFMPEG, '-v', 'error', '-i', fixture, '-c', 'copy', target])
             require(made.returncode == 0, made.stderr)
             others.append(target)
-        swift_regression('trim-tests', [ROOT/'Sources/Model.swift', ROOT/'Tests/TrimRegression.swift'], [FFMPEG, FFPROBE, fixture, *others])
+        swift_regression('trim-tests', [ROOT/'Sources/Model.swift', ROOT/'Sources/ReportProblem.swift', ROOT/'Tests/TrimRegression.swift'], [FFMPEG, FFPROBE, fixture, *others])
     check('GUI trim regression suite', trim_regression)
-    check('tool installer regression suite', lambda: swift_regression('tool-setup-tests', [ROOT/'Sources/Model.swift', ROOT/'Sources/ToolSetup.swift', ROOT/'Tests/ToolSetupRegression.swift'], []))
+    check('tool installer regression suite', lambda: swift_regression('tool-setup-tests', [ROOT/'Sources/Model.swift', ROOT/'Sources/ReportProblem.swift', ROOT/'Sources/ToolSetup.swift', ROOT/'Tests/ToolSetupRegression.swift'], []))
+    check('problem report link, redaction and failure log regression suite', lambda: swift_regression('report-tests', [ROOT/'Sources/ReportProblem.swift', ROOT/'Tests/ReportProblemRegression.swift'], []))
     check('appearance entitlement regression suite', lambda: swift_regression('appearance-tests', [ROOT/'Sources/AppAccess.swift', ROOT/'Tests/AppearanceRegression.swift'], []))
     def license_regression():
         fixture = tmp/'license-fixture.json'

@@ -40,6 +40,12 @@ struct MacMP4App: App {
             CommandGroup(replacing: .appInfo) {
                 Button(L("關於 MacMP4")) { showingAbout = true }
             }
+            CommandGroup(replacing: .help) {
+                Button(L("回報問題…")) {
+                    let store = JobStore.shared
+                    ReportProblem.open(job: store.jobs.last { if case .failed = $0.status { return true }; return false }, store: store)
+                }
+            }
         }
     }
 }
@@ -610,6 +616,8 @@ struct JobRow: View {
                 }
                 if case .failed = job.status {
                     Button(L("重試")) { store.retry(job) }.disabled(store.isRunning)
+                    Button(L("回報問題")) { ReportProblem.open(job: job, store: store) }
+                        .help(L("開啟回報表單。會附上版本與這支影片的錯誤紀錄（已遮蔽檔名與路徑），送出前可以檢視。"))
                 }
                 if !busy {
                     Button { store.remove(job) } label: { Image(systemName: "xmark") }
@@ -707,5 +715,21 @@ private struct AboutView: View {
                 Button(L("關閉")) { dismiss() }.keyboardShortcut(.cancelAction)
             }
         }.padding(28).frame(width: 480)
+    }
+}
+
+extension ReportProblem {
+    /// Opens the report form in the browser with this job's failure log (or just the versions when
+    /// there is none). The ffmpeg version is read off the main thread so the click never stalls.
+    @MainActor static func open(job: Job?, store: JobStore) {
+        let log = job?.failureLog ?? ""
+        let ffmpeg = store.ffmpeg
+        let language = languageCode()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let diagnostics = Diagnostics(appVersion: appVersion(), macOS: macOSVersion(),
+                                          ffmpeg: ffmpeg.flatMap { ffmpegVersion(path: $0) }, errorLog: log)
+            let url = makeURL(diagnostics, language: language)
+            DispatchQueue.main.async { NSWorkspace.shared.open(url) }
+        }
     }
 }

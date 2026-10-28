@@ -19,6 +19,8 @@ final class Job: ObservableObject, Identifiable {
     @Published var status: JobStatus = .waiting
     @Published var duration: Double?
     @Published var outURL: URL?
+    /// Redacted diagnostics for the problem-report form; only read and written on the main thread.
+    var failureLog = ""
 
     init(url: URL) {
         self.url = url
@@ -302,6 +304,13 @@ final class JobStore: ObservableObject {
         DispatchQueue.main.async { job.status = s }
     }
 
+    /// Stores redacted diagnostics for a failed job. Called before the failed status so the
+    /// report button never shows without its log.
+    private func recordFailure(_ job: Job, _ lines: [String]) {
+        let log = ReportProblem.redact(lines.joined(separator: "\n"), input: job.url)
+        DispatchQueue.main.async { job.failureLog = String(log.suffix(ReportProblem.maxLogCharacters)) }
+    }
+
     private func track(_ process: Process) {
         procLock.lock()
         currentProcess = process
@@ -347,11 +356,13 @@ final class JobStore: ObservableObject {
         let startTime = Date()
         setStatus(job, .probing)
         guard let probe = self.probe(job.url, using: ffprobe) else {
+            if !stopRequested { recordFailure(job, ["macmp4: ffprobe could not read the file (.\(ext))"]) }
             setStatus(job, stopRequested ? .waiting : .failed(L("無法讀取檔案")))
             return
         }
         DispatchQueue.main.async { job.duration = probe.duration }
         guard probe.hasVideo || probe.hasAudio else {
+            recordFailure(job, ["macmp4: no audio or video stream found (.\(ext))"])
             setStatus(job, .failed(L("找不到影音串流")))
             return
         }
@@ -365,6 +376,7 @@ final class JobStore: ObservableObject {
         catch { setStatus(job, .failed(error.localizedDescription)); return }
         let strategies = FF.strategies(for: probe, allowReencode: options.allowReencode, hardwareAccel: options.hardwareAccel, forceH264: encodeH264)
         if strategies.isEmpty {
+            recordFailure(job, ["macmp4: video codec \(probe.videoCodec ?? "?") cannot be remuxed to MP4 and re-encoding is off"])
             setStatus(job, .failed(String(format: L("影片編碼 %@ 無法直接封裝成 MP4，請開啟「必要時重新編碼影片」。"), probe.videoCodec ?? "?")))
             return
         }
@@ -373,10 +385,13 @@ final class JobStore: ObservableObject {
         let transaction: OutputTransaction
         do { transaction = try OutputTransaction(destination: outURL, overwrite: overwrite) }
         catch {
+            recordFailure(job, ["macmp4: could not prepare the output location: \(error.localizedDescription)"])
             setStatus(job, .failed(error.localizedDescription))
             return
         }
 
+        var attemptLogs: [String] = []
+        let sourceSummary = "source: .\(ext), video \(probe.videoCodec ?? "none"), audio \(probe.audioCodec ?? "none")"
         for strategy in strategies {
             if stopRequested { setStatus(job, .waiting); return }
 
@@ -389,6 +404,9 @@ final class JobStore: ObservableObject {
                             },
                             progress: { [weak self] pct, speed in
                                 self?.setStatus(job, .converting(percent: pct, speed: speed, label: strategy.label))
+                            },
+                            errorOutput: { output in
+                                attemptLogs.append("[\(strategy.label)]\n" + ReportProblem.tail(output, lines: 8, maxCharacters: 1200))
                             })
 
             procLock.lock(); currentProcess = nil; procLock.unlock()
@@ -398,6 +416,7 @@ final class JobStore: ObservableObject {
                 if stopRequested { setStatus(job, .waiting); return }
                 do { try transaction.commit() }
                 catch {
+                    recordFailure(job, ["macmp4: could not save the output: \(error.localizedDescription)"])
                     setStatus(job, .failed(String(format: L("無法儲存輸出: %@"), error.localizedDescription)))
                     return
                 }
@@ -410,6 +429,7 @@ final class JobStore: ObservableObject {
             if stopRequested { setStatus(job, .waiting); return }
         }
 
+        recordFailure(job, [sourceSummary] + attemptLogs)
         setStatus(job, .failed(L("轉換失敗(來源檔可能損壞)")))
     }
 }
