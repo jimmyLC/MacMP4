@@ -616,8 +616,10 @@ struct JobRow: View {
                 }
                 if case .failed = job.status {
                     Button(L("重試")) { store.retry(job) }.disabled(store.isRunning)
-                    Button(L("回報問題")) { ReportProblem.open(job: job, store: store) }
-                        .help(L("開啟回報表單。會附上版本與這支影片的錯誤紀錄（已遮蔽檔名與路徑），送出前可以檢視。"))
+                    if ReportProblem.isOffered(failures: job.failureCount) {
+                        Button(L("回報問題")) { ReportProblem.open(job: job, store: store) }
+                            .help(L("開啟回報表單。會附上版本與這支影片的錯誤紀錄（已遮蔽檔名與路徑），送出前可以檢視。"))
+                    }
                 }
                 if !busy {
                     Button { store.remove(job) } label: { Image(systemName: "xmark") }

@@ -21,6 +21,8 @@ final class Job: ObservableObject, Identifiable {
     @Published var outURL: URL?
     /// Redacted diagnostics for the problem-report form; only read and written on the main thread.
     var failureLog = ""
+    /// How many times this job has ended in `.failed`; a retry keeps counting.
+    @Published var failureCount = 0
 
     init(url: URL) {
         self.url = url
@@ -301,7 +303,10 @@ final class JobStore: ObservableObject {
     }
 
     private func setStatus(_ job: Job, _ s: JobStatus) {
-        DispatchQueue.main.async { job.status = s }
+        DispatchQueue.main.async {
+            if case .failed = s { job.failureCount += 1 }
+            job.status = s
+        }
     }
 
     /// Stores redacted diagnostics for a failed job. Called before the failed status so the

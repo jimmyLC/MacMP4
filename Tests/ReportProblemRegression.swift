@@ -26,6 +26,10 @@ struct ReportProblemRegression {
         check(tail == "line 49\nline 50\nError: the real reason", "tail kept the wrong lines: \(tail)")
         check(ReportProblem.tail(String(repeating: "x", count: 9000), lines: 5).count == ReportProblem.maxLogCharacters, "tail is not bounded")
 
+        // The button shows only after the first attempt plus two retries have failed.
+        check(!ReportProblem.isOffered(failures: 0) && !ReportProblem.isOffered(failures: 1) && !ReportProblem.isOffered(failures: 2), "button offered too early")
+        check(ReportProblem.isOffered(failures: 3) && ReportProblem.isOffered(failures: 10), "button not offered after repeated failures")
+
         // The link: product and language in the query, diagnostics only in the fragment.
         let log = "Error: Invalid data found when processing input"
         let url = ReportProblem.makeURL(.init(appVersion: "1.1.0", macOS: "15.1.0", ffmpeg: "7.1.1", errorLog: log), language: "zh-Hant")
