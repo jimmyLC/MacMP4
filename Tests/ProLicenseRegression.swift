@@ -59,17 +59,20 @@ final class PaymentMockProtocol: URLProtocol {
         precondition(invalidURL == nil && orderCalls==0 && vault.data==nil)
         let url=await client.purchase(email:"Buyer@example.com",method:"ApplePay")
         precondition(url != nil && client.hasPendingPurchase && orderCalls==1)
-        let pendingResult=await client.checkPayment(); precondition(!pendingResult && !access.isPro)
+        let pendingResult=await client.checkPayment(); precondition(!pendingResult && !access.isPro && !client.showPurchaseCelebration)
         await client.prepareNewOrder()
         precondition(!client.hasPendingPurchase && client.hasRecoverablePurchases, "old order recovery discarded")
         paid=true
         let paidResult=await client.checkPayment()
-        precondition(paidResult && access.isPro && !client.hasPendingPurchase && !client.serial.isEmpty)
+        precondition(paidResult && access.isPro && !client.hasPendingPurchase && !client.serial.isEmpty && client.showPurchaseCelebration)
+        client.dismissPurchaseCelebration()
+        _ = await client.checkPayment()
+        precondition(!client.showPurchaseCelebration, "repeated check replayed celebration")
         PaymentMockProtocol.handler={ _ in throw URLError(.notConnectedToInternet) }
         let offlineAccess=AppAccess(defaults:defaults)
         let offline=ProLicenseStore(configuration:config,vault:vault,session:session)
         await offline.resume(access:offlineAccess)
-        precondition(offlineAccess.isPro,"valid lifetime receipt lost offline")
+        precondition(offlineAccess.isPro && !offline.showPurchaseCelebration,"offline restore replayed celebration")
         PaymentMockProtocol.handler={ _ in (409,response(["error":"license_revoked"])) }
         await offline.restore(email:"buyer@example.com",serial:client.serial)
         precondition(!offlineAccess.isPro,"revoked license retained Pro")

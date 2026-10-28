@@ -149,6 +149,7 @@ final class ProLicenseStore: ObservableObject {
     @Published private(set) var hasPendingPurchase = false
     @Published private(set) var message: String?
     @Published private(set) var options: PaymentOptions?
+    @Published private(set) var showPurchaseCelebration = false
     private let configuration: ProConfiguration?
     private let vault: LicenseVault
     private let session: URLSession
@@ -189,6 +190,7 @@ final class ProLicenseStore: ObservableObject {
     private func persist(_ updated: LicenseRecord) throws {
         try vault.write(JSONEncoder().encode(updated)); record = updated
     }
+    @MainActor func dismissPurchaseCelebration() { showPurchaseCelebration = false }
     @MainActor func reportBrowserFailure() { message = L("無法開啟瀏覽器，請按「重新開啟付款頁」重試。") }
     @MainActor func loadOptions() async {
         guard isConfigured else { return }
@@ -239,7 +241,7 @@ final class ProLicenseStore: ObservableObject {
             do {
                 let reply: PaidReply = try await call("/v1/orders/" + orderId, method: "GET", token: pending.accessToken)
                 if reply.status == "paid" {
-                    try accept(reply, expectedEmail: pending.email)
+                    try accept(reply, expectedEmail: pending.email, celebratePurchase: true)
                     message = L("超級感謝！Pro 已啟用。")
                     return true
                 }
@@ -255,7 +257,7 @@ final class ProLicenseStore: ObservableObject {
         do {
             if let id = pending.orderId {
                 let reply: PaidReply = try await call("/v1/orders/" + id, method: "GET", token: pending.accessToken)
-                if reply.status == "paid" { try accept(reply, expectedEmail: pending.email); return }
+                if reply.status == "paid" { try accept(reply, expectedEmail: pending.email, celebratePurchase: true); return }
             }
             var updated = record
             var previous = updated.previousPending ?? []
@@ -277,14 +279,16 @@ final class ProLicenseStore: ObservableObject {
             access?.updateEntitlement(.free); message = LicenseError.revoked.localizedDescription
         } catch { if !quietly { message = error.localizedDescription } }
     }
-    @MainActor private func accept(_ reply: PaidReply, expectedEmail: String) throws {
+    @MainActor private func accept(_ reply: PaidReply, expectedEmail: String, celebratePurchase: Bool = false) throws {
         guard reply.status == "paid", let email = reply.email, let serial = reply.serial,
               let token = reply.licenseToken, let configuration,
               email == normalizedLicenseEmail(expectedEmail) else { throw LicenseError.invalid }
         _ = try verifyLicenseToken(token, email: email, configuration: configuration)
+        let firstPurchase = celebratePurchase && record.licenseToken.isEmpty
         var updated = record
         updated.email = email; updated.serial = serial; updated.licenseToken = token; updated.pending = nil; updated.previousPending = nil
         try persist(updated); publishRecord(); access?.updateEntitlement(.pro)
+        if firstPurchase { showPurchaseCelebration = true }
     }
     private func call<T: Decodable>(_ path: String, method: String = "POST", body: [String:String]? = nil, token: String? = nil) async throws -> T {
         guard let base = configuration?.baseURL else { throw LicenseError.unavailable }

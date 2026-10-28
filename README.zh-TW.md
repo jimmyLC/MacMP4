@@ -153,12 +153,14 @@ Apple Silicon 版本請至 [GitHub Release v1](https://github.com/jimmyLC/MacMP4
 
 MacMP4 開啟時會檢查 FFmpeg 與 ffprobe。缺少工具時會顯示設定引導；已安裝 Homebrew 可直接按「安裝 FFmpeg」，查看安裝訊息，失敗時可重試。沒有 Homebrew 則提供官方安裝說明。返回 App 後自動重新檢查，不必重開。Homebrew 目前正式支援 macOS 15 以上，較舊系統需自行安裝相容工具。
 
-Free 顯示 Free 標誌並固定使用淺色外觀。Pro 顯示 Pro 標誌，可選擇淺色、深色與跟隨系統，並記住外觀偏好。Free 保留完整轉檔功能。Pro 規劃為 NT$90 終身買斷；付款及 Email／序號啟用尚未串接，目前正式建置預設為 Free。開發預覽可用 `-D MACMP4_PREVIEW_PRO` 編譯，build.sh 不會啟用此旗標。
+Free 顯示 Free 標誌並固定使用淺色外觀。Pro 顯示 Pro 標誌，可選擇淺色、深色與跟隨系統，並記住外觀偏好。Free 保留完整轉檔功能。Pro 為 NT$90 終身買斷；開發分支已串接付款與 Email／序號啟用。開發預覽可用 `-D MACMP4_PREVIEW_PRO` 編譯，build.sh 不會啟用此旗標。
 
 進階選項新增「強制 H.264」，預設關閉，Free／Pro 均可使用。開啟後略過直接封裝策略，輸出 H.264 影片與 AAC 音訊（來源有音訊時），支援 VideoToolbox 與 CPU 備援；此選項優先於一般的重新編碼備援設定。CLI 使用 `--force-h264`，不可與 `--no-reencode` 並用。既有 MP4／M4V 與不覆蓋檔案的略過規則維持不變。
 
-支持入口統一使用「超級感謝」，搭配愛心內含 $ 的圖示。面板介紹 NT$90 終身買斷的 Pro 版本；目前尚未提供付款。
+支持入口統一使用「超級感謝」，搭配愛心內含 $ 的圖示。面板介紹 NT$90 終身買斷的 Pro 版本，並提供付款入口。
 
 ## Pro 金流串接（開發中）
 
-`codex/ecpay-pro` 已加入綠界付款與簽章終身授權流程，後端為獨立 Worker／D1。正式收款須先完成金鑰、測試回呼與部署驗證，目前維持關閉。Pro 為 NT$90 一次買斷，轉檔維持免費；本商店目前僅支援台灣發行的信用卡。詳見[串接與上線條件](docs/ECPAY_INTEGRATION.md)。
+`codex/ecpay-pro` 已加入綠界付款與簽章終身授權流程，後端為獨立 Worker／D1。正式收款已開啟供擁有者驗收，實際付款尚未驗證，目前維持關閉。Pro 為 NT$90 一次買斷，轉檔維持免費；本商店目前僅支援台灣發行的信用卡。詳見[串接與上線條件](docs/ECPAY_INTEGRATION.md)。
+
+首次購買經確認後，App 會播放短暫煙火並顯示 Pro 歡迎訊息；恢復授權不會重播，開啟減少動態效果時則只顯示訊息。

@@ -80,7 +80,7 @@ The support entry is named 超級感謝 / Super Thanks. Its native heart silhoue
 
 Verification: arm64 GUI/CLI build and all regressions passed (171 English keys). Synthetic HEVC/AAC input remains HEVC by default; forced CPU and automatic hardware/fallback output both probe as H.264/AAC. The actual GUI model was tested with Force H.264 enabled and normal re-encoding disabled. Native UI inspection confirmed the checkbox starts off, enables the H.264/AAC labels, disables the redundant fallback checkbox, and returns to default when turned off. The Super Thanks entry and heart/dollar cutout were visually inspected in the running Traditional Chinese Free preview. No public release, website deployment or installed-app replacement was performed for this change.
 
-The Super Thanks entry now sits in the inspector footer between copyright and About & License, with a compact 14 pt icon. Language moves directly beneath Appearance. If translated labels exceed the available footer width, the footer uses two rows instead of truncating the actions.
+Copyright, Super Thanks and About & License share one compact row in the inspector footer. Super Thanks is red for Free and secondary gray for Pro. Language remains directly beneath Appearance.
 
 
 ## Basic trimming — advanced opt-in

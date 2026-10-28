@@ -154,12 +154,14 @@ To build from source, use Xcode with the macOS 26 SDK or later, then run `./buil
 
 On launch, MacMP4 checks for both FFmpeg and ffprobe. If either is missing, setup offers **Install FFmpeg** through an existing Homebrew installation, with live output and retry on failure. Without Homebrew, setup links to its official instructions. Returning to the app rechecks the tools without restarting. Homebrew currently supports macOS 15+; on older macOS versions, install compatible tools separately.
 
-Free displays a Free badge and always uses Light appearance. Pro displays a Pro badge and supports Light, Dark and Follow System, with the appearance preference saved between launches. All conversion features remain available in Free. Pro is planned as a one-time NT$90 lifetime purchase; checkout and email/serial activation are not connected yet, so production builds currently start Free. Developer previews can compile with `-D MACMP4_PREVIEW_PRO`; build.sh never sets that flag.
+Free displays a Free badge and always uses Light appearance. Pro displays a Pro badge and supports Light, Dark and Follow System, with the appearance preference saved between launches. All conversion features remain available in Free. Pro is a one-time NT$90 lifetime purchase with checkout and email/serial activation in the development branch. Developer previews can compile with `-D MACMP4_PREVIEW_PRO`; build.sh never sets that flag.
 
 The Advanced options include **Force H.264**, off by default and available in both Free and Pro. When enabled, conversion skips stream-copy strategies and uses H.264 video plus AAC audio (if the source has audio), with VideoToolbox and CPU fallback. This takes precedence over the normal re-encode fallback setting. The CLI equivalent is `--force-h264`; it cannot be combined with `--no-reencode`. Existing MP4/M4V and no-overwrite skip rules are unchanged.
 
-The support entry is **Super Thanks**, with a heart-and-dollar icon. The panel describes the NT$90 lifetime Pro edition; checkout is not available yet.
+The support entry is **Super Thanks**, with a heart-and-dollar icon. The panel describes the NT$90 lifetime Pro edition and its checkout.
 
 ## Pro payment integration (development)
 
-An ECPay checkout and signed lifetime license flow is implemented on `codex/ecpay-pro`, with a separate Worker/D1 backend. Production checkout remains disabled until credentials, staging callbacks and deployment are verified. Pro costs NT$90 once; conversion remains free. This store currently accepts Taiwan-issued credit cards only. See [integration and release gates](docs/ECPAY_INTEGRATION.md).
+An ECPay checkout and signed lifetime license flow is implemented on `codex/ecpay-pro`, with a separate Worker/D1 backend. Production checkout is enabled for owner acceptance; a real payment has not yet been verified. Pro costs NT$90 once; conversion remains free. This store currently accepts Taiwan-issued credit cards only. See [integration and release gates](docs/ECPAY_INTEGRATION.md).
+
+After the first verified purchase, the app shows a brief fireworks celebration and a Pro welcome. License restoration does not replay it; Reduce Motion skips the animation.
