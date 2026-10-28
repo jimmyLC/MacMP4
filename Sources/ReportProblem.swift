@@ -7,7 +7,7 @@ import Foundation
 /// so nothing leaves the Mac until the customer reads the form and presses submit. The form
 /// shows exactly what will be attached and lets them switch it off.
 enum ReportProblem {
-    static let formURL = "https://support.jimmy-tools.com/"
+    static let formURL = "https://support.jimmy-tools.com/add"
     static let product = "macmp4"
     /// The form accepts 8000 characters; keeping well below that keeps the link short.
     static let maxLogCharacters = 4000
