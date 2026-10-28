@@ -56,7 +56,7 @@ struct ReportProblemRegression {
         let log = "Error: Invalid data found when processing input"
         let url = ReportProblem.makeURL(.init(appVersion: "1.1.0", macOS: "15.1.0", ffmpeg: "7.1.1", errorLog: log), language: "zh-Hant")
         let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)!
-        check(parts.scheme == "https" && parts.host == "support.jimmy-tools.com", "unexpected host: \(url)")
+        check(parts.scheme == "https" && parts.host == "support.jimmy-tools.com" && parts.path == "/add", "unexpected address: \(url)")
         check(parts.queryItems?.first { $0.name == "product" }?.value == "macmp4", "product missing")
         check(parts.queryItems?.first { $0.name == "lang" }?.value == "zh-Hant", "language missing")
         check(!(parts.query ?? "").contains("Invalid"), "diagnostics must never be in the query string")
