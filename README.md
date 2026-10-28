@@ -76,7 +76,7 @@ Options: output location, overwrite existing MP4s, automatic re-encode fallback,
 
 ## Report a problem (GUI)
 
-A file that fails again after one retry shows a **Report a Problem** button next to Retry; a one-off failure is usually fixed by trying again. The same command is always available under **Help → Report a Problem…**. It opens https://support.jimmy-tools.com in your browser with the app version, macOS version, ffmpeg version and the tail of ffmpeg's error output already filled in. File names, folder names, volume names and email addresses are removed from that log before the link is built.
+A file that fails again after one retry shows a **Report a Problem** button next to Retry; a one-off failure is usually fixed by trying again. The same command is always available under **Help → Report a Problem…**. It opens https://support.jimmy-tools.com/add in your browser with the app version, macOS version, ffmpeg version and the tail of ffmpeg's error output already filled in. File names, folder names, volume names and email addresses are removed from that log before the link is built.
 
 The diagnostics travel in the URL fragment (`#d=…`), which a browser never sends to a server. Nothing leaves your Mac until you read the form and press Send, and you can switch the diagnostics off there. Video files are never uploaded.
 
