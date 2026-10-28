@@ -84,9 +84,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+BUILD_NUMBER=$(git rev-list --count HEAD 2>/dev/null || echo 1)
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
 
 echo "==> Ad-hoc 簽名"
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+codesign --force --deep --sign - "$APP" >/dev/null
 
 echo ""
 echo "✅ 建置完成:"

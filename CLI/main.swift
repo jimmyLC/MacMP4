@@ -33,7 +33,11 @@ while i < args.count {
     switch args[i] {
     case "--out":
         i += 1
-        if i < args.count { outDir = URL(fileURLWithPath: args[i]) }
+        guard i < args.count else {
+            FileHandle.standardError.write(Data("--out 需要指定資料夾。\n".utf8))
+            exit(2)
+        }
+        outDir = URL(fileURLWithPath: args[i])
     case "--no-overwrite":
         overwrite = false
     case "--force-h264":
@@ -59,6 +63,30 @@ if forceH264 && !allowReencode {
 guard !inputs.isEmpty else {
     printUsage()
     exit(1)
+}
+
+if let dir = outDir {
+    do { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
+    catch {
+        FileHandle.standardError.write(Data("無法建立輸出資料夾:\(error.localizedDescription)\n".utf8))
+        exit(1)
+    }
+}
+
+// Ctrl+C / kill skip deinit, which would leave the hidden staging folder behind.
+var activeTransaction: OutputTransaction?
+let signalLock = NSLock()
+var signalSources: [DispatchSourceSignal] = []
+for sig in [SIGINT, SIGTERM, SIGHUP] {
+    signal(sig, SIG_IGN)
+    let source = DispatchSource.makeSignalSource(signal: sig, queue: .global())
+    source.setEventHandler {
+        signalLock.lock(); let transaction = activeTransaction; signalLock.unlock()
+        transaction?.cleanup()
+        exit(128 + sig)
+    }
+    source.resume()
+    signalSources.append(source)
 }
 
 guard let ffmpeg = FF.findTool("ffmpeg"), let ffprobe = FF.findTool("ffprobe") else {
@@ -92,14 +120,12 @@ guard !files.isEmpty else {
 }
 
 var failures = 0
+var claimed = Set<String>()
 for (idx, input) in files.enumerated() {
     let fm = FileManager.default
-    let out: URL
-    if let dir = outDir {
-        out = dir.appendingPathComponent(input.deletingPathExtension().lastPathComponent + ".mp4")
-    } else {
-        out = input.deletingLastPathComponent().appendingPathComponent(input.deletingPathExtension().lastPathComponent + ".mp4")
-    }
+    let name = input.deletingPathExtension().lastPathComponent + ".mp4"
+    // Same-named inputs (a.ts + a.mkv, or equal names from different folders) get "a 2.mp4".
+    let out = uniqueOutputURL((outDir ?? input.deletingLastPathComponent()).appendingPathComponent(name), claimed: claimed)
 
     print("[\(idx + 1)/\(files.count)] \(input.lastPathComponent)")
 
@@ -132,6 +158,9 @@ for (idx, input) in files.enumerated() {
         failures += 1
         continue
     }
+    claimed.insert(out.standardizedFileURL.path)
+    signalLock.lock(); activeTransaction = transaction; signalLock.unlock()
+    defer { signalLock.lock(); activeTransaction = nil; signalLock.unlock() }
     var succeeded = false
     let t0 = Date()
     for strategy in strategies {

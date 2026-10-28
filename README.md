@@ -95,6 +95,9 @@ macmp4-cli --no-gpu --no-reencode x.ts    # strict: copy-only strategies
 | `--no-overwrite` | Skip files whose MP4 already exists |
 | `--no-reencode` | Disable the full re-encode last resort |
 | `--no-gpu` | Use CPU x264 instead of the VideoToolbox encoder |
+| `--force-h264` | Always output H.264 video + AAC audio (cannot combine with `--no-reencode`) |
+
+Same-named outputs in one run are never overwritten: `a.ts` and `a.mkv` produce `a.mp4` and `a 2.mp4`. All audio tracks are kept. `--out` creates the folder if needed.
 
 ## GPU acceleration, explained
 

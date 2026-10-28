@@ -5,6 +5,8 @@ import Darwin
 struct ProbeResult {
     var videoCodec: String?
     var audioCodec: String?
+    /// Codecs of every audio stream, in file order (`audioCodec` is the first).
+    var audioCodecs: [String] = []
     var duration: Double?
     var hasVideo: Bool { videoCodec != nil }
     var hasAudio: Bool { audioCodec != nil }
@@ -111,8 +113,9 @@ enum FF {
                     if (s["disposition"] as? [String: Any])?["attached_pic"] as? Int != 1 {
                         result.videoCodec = s["codec_name"] as? String
                     }
-                } else if type == "audio", result.audioCodec == nil {
-                    result.audioCodec = s["codec_name"] as? String
+                } else if type == "audio", let codec = s["codec_name"] as? String {
+                    if result.audioCodec == nil { result.audioCodec = codec }
+                    result.audioCodecs.append(codec)
                 }
             }
         }
@@ -129,18 +132,22 @@ enum FF {
     /// 依來源編碼決定轉換策略(由快到慢,逐一嘗試)
     static func strategies(for probe: ProbeResult, allowReencode: Bool, hardwareAccel: Bool, forceH264: Bool = false) -> [Strategy] {
         if forceH264 && !probe.hasVideo { return [] }
-        let maps = ["-map", "0:v:0?", "-map", "0:a:0?"]
+        // Keep every audio track (dual-language recordings); only the first video.
+        let maps = ["-map", "0:v:0?", "-map", "0:a?"]
         let vOK = probe.videoCodec.map { mp4VideoCodecs.contains($0) } ?? false
-        let aOK = probe.audioCodec.map { mp4AudioCodecs.contains($0) } ?? true
+        let audioCodecs = probe.audioCodecs.isEmpty ? (probe.audioCodec.map { [$0] } ?? []) : probe.audioCodecs
+        let aOK = audioCodecs.allSatisfy { mp4AudioCodecs.contains($0) }
+        // Copied HEVC defaults to the hev1 tag, which QuickTime/AVFoundation refuses to play.
+        let copyTag = probe.videoCodec == "hevc" ? ["-tag:v", "hvc1"] : []
         var list: [Strategy] = []
 
         if !forceH264 && probe.hasVideo && vOK && aOK {
             // 最理想:影片+音訊都直接複製,零損失、極快(純 I/O,無需也無法用 GPU 加速)
-            list.append(Strategy(label: L("無損轉換"), args: maps + ["-c", "copy"]))
+            list.append(Strategy(label: L("無損轉換"), args: maps + ["-c", "copy"] + copyTag))
         }
         if !forceH264 && probe.hasVideo && vOK {
             // 音訊重編碼:修復損壞的 AAC 幀等問題(影片仍為複製)
-            list.append(Strategy(label: L("修復音訊"), args: maps + ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"]))
+            list.append(Strategy(label: L("修復音訊"), args: maps + ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"] + copyTag))
         }
         if allowReencode || forceH264 {
             if hardwareAccel {
@@ -245,11 +252,35 @@ final class OutputTransaction {
         self.destination = destination
         self.overwrite = overwrite
         try Self.validateDestination(destination, overwrite: overwrite)
-        directory = destination.deletingLastPathComponent()
-            .appendingPathComponent(".macmp4-\(UUID().uuidString)", isDirectory: true)
+        let parent = destination.deletingLastPathComponent()
+        Self.removeStaleDirectories(in: parent)
+        directory = parent.appendingPathComponent("\(Self.prefix)\(getpid())-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
         temporaryURL = directory.appendingPathComponent("output.mp4")
     }
+
+    /// Staging folders are named `.macmp4-p<pid>-<uuid>`. A crash, force-quit or Ctrl+C skips
+    /// `deinit`, so the next run removes folders whose owning process no longer exists.
+    private static let prefix = ".macmp4-p"
+    private static let cleanedLock = NSLock()
+    private static var cleanedDirectories = Set<String>()
+
+    static func removeStaleDirectories(in parent: URL) {
+        cleanedLock.lock()
+        let first = cleanedDirectories.insert(parent.standardizedFileURL.path).inserted
+        cleanedLock.unlock()
+        guard first, let names = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else { return }
+        for name in names where name.hasPrefix(prefix) {
+            let rest = name.dropFirst(prefix.count)
+            guard let pidText = rest.split(separator: "-", maxSplits: 1).first, let pid = pid_t(pidText) else { continue }
+            if kill(pid, 0) == -1 && errno == ESRCH {
+                try? FileManager.default.removeItem(at: parent.appendingPathComponent(name))
+            }
+        }
+    }
+
+    /// Remove the staging folder now (signal handlers cannot rely on `deinit`).
+    func cleanup() { try? FileManager.default.removeItem(at: directory) }
 
     private static func validateDestination(_ url: URL, overwrite: Bool) throws {
         // attributesOfItem inspects the link itself: reject directories, symlinks
@@ -271,19 +302,43 @@ final class OutputTransaction {
         // Both paths are on the same volume. rename atomically replaces a file
         // without truncating it first; RENAME_EXCL prevents no-overwrite races
         // without requiring hard-link support on the output filesystem.
-        let result = temporaryURL.withUnsafeFileSystemRepresentation { source in
+        var failure: Int32 = 0
+        temporaryURL.withUnsafeFileSystemRepresentation { source in
             destination.withUnsafeFileSystemRepresentation { target in
-                overwrite ? Darwin.rename(source!, target!) : Darwin.renamex_np(source!, target!, UInt32(RENAME_EXCL))
+                if overwrite {
+                    if Darwin.rename(source!, target!) != 0 { failure = errno }
+                } else if Darwin.renamex_np(source!, target!, UInt32(RENAME_EXCL)) != 0 {
+                    failure = errno
+                    // exFAT and some network volumes lack RENAME_EXCL: check, then plain rename.
+                    if failure == ENOTSUP || failure == EINVAL {
+                        var info = stat()
+                        if Darwin.lstat(target!, &info) == 0 { failure = EEXIST }
+                        else { failure = Darwin.rename(source!, target!) == 0 ? 0 : errno }
+                    }
+                }
             }
         }
-        guard result == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        guard failure == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(failure)) }
     }
 
     func discardAttempt() {
         try? FileManager.default.removeItem(at: temporaryURL)
     }
 
-    deinit { try? FileManager.default.removeItem(at: directory) }
+    deinit { cleanup() }
+}
+
+/// Picks an output URL not already claimed by another file in the same batch, so
+/// `a.ts` and `a.mkv` (or same-named files from different folders) never overwrite each other.
+func uniqueOutputURL(_ url: URL, claimed: Set<String>) -> URL {
+    guard claimed.contains(url.standardizedFileURL.path) else { return url }
+    let dir = url.deletingLastPathComponent(), base = url.deletingPathExtension().lastPathComponent, ext = url.pathExtension
+    var n = 2
+    while true {
+        let candidate = dir.appendingPathComponent("\(base) \(n)").appendingPathExtension(ext)
+        if !claimed.contains(candidate.standardizedFileURL.path) { return candidate }
+        n += 1
+    }
 }
 
 /// 秒數 → "H:MM:SS" / "M:SS"

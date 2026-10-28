@@ -107,6 +107,40 @@ struct ModelRegression {
         review.clearFinished()
         precondition(review.jobs.isEmpty, "completed job not cleared")
         withExtendedLifetime(observation) {}
+        // Same-named sources written to one custom folder must not overwrite each other.
+        let dupOut = root.appendingPathComponent("dup-out")
+        try fm.createDirectory(at: dupOut, withIntermediateDirectories: false)
+        var dupInputs: [URL] = []
+        for name in ["one", "two"] {
+            let dir = root.appendingPathComponent(name)
+            try fm.createDirectory(at: dir, withIntermediateDirectories: false)
+            let file = dir.appendingPathComponent("dup.ts")
+            try fm.copyItem(at: source, to: file)
+            dupInputs.append(file)
+        }
+        let dup = store(ffmpeg, ffprobe)
+        dup.outputToSource = false; dup.customOutputDir = dupOut
+        dup.add(urls: dupInputs); dup.start(); wait { !dup.isRunning }
+        precondition(dup.jobs.allSatisfy { if case .done = $0.status { return true }; return false }, "duplicate-name jobs not done")
+        precondition(fm.fileExists(atPath: dupOut.appendingPathComponent("dup.mp4").path) && fm.fileExists(atPath: dupOut.appendingPathComponent("dup 2.mp4").path), "same-name outputs collided")
+        // Options are copied at start(): toggling Force H.264 mid-batch must not affect it.
+        let snapInput = root.appendingPathComponent("snap.mkv")
+        try fm.copyItem(at: URL(fileURLWithPath: args[4]), to: snapInput)
+        let snap = store(ffmpeg, ffprobe)
+        snap.add(urls: [snapInput]); snap.start(); snap.forceH264 = true; wait { !snap.isRunning }
+        guard let snapResult = FF.probe(url: root.appendingPathComponent("snap.mp4"), ffprobe: ffprobe) else { fatalError("snapshot output missing") }
+        precondition(snapResult.videoCodec == "hevc", "settings changed mid-batch were applied")
+        // HEVC copy must carry the hvc1 tag, and every audio track must survive.
+        let probe = Process()
+        probe.executableURL = URL(fileURLWithPath: ffprobe)
+        probe.arguments = ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_tag_string", "-of", "csv=p=0", root.appendingPathComponent("snap.mp4").path]
+        let pipe = Pipe(); probe.standardOutput = pipe; try probe.run()
+        let tag = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        probe.waitUntilExit()
+        precondition(tag == "hvc1", "HEVC copy tag is \(tag)")
+        let multi = FF.strategies(for: ProbeResult(videoCodec: "h264", audioCodec: "aac", audioCodecs: ["aac", "mp2"], duration: 1), allowReencode: false, hardwareAccel: false)
+        precondition(multi.count == 1 && multi[0].label == L("修復音訊"), "unsupported second audio track must force audio repair")
+        precondition(multi[0].args.contains("0:a?"), "all audio tracks must be mapped")
         print("PASS: GUI model short clip, directory preservation, cancel conversion, cancel probing, failed output validation, temporary cleanup, live UI updates, completed-only clearing")
     }
 }

@@ -54,6 +54,17 @@ struct OutputRegression {
         let link = root.appendingPathComponent("link.mp4")
         try fm.createSymbolicLink(at: link, withDestinationURL: output)
         do { _ = try OutputTransaction(destination: link, overwrite: true); fatalError("symlink accepted") } catch {}
+        // Staging folders left by dead processes are removed; live ones are kept.
+        let staleRoot = root.appendingPathComponent("stale")
+        try fm.createDirectory(at: staleRoot, withIntermediateDirectories: false)
+        let dead = staleRoot.appendingPathComponent(".macmp4-p4000000-\(UUID().uuidString)")
+        let alive = staleRoot.appendingPathComponent(".macmp4-p\(getpid())-\(UUID().uuidString)")
+        for dir in [dead, alive] { try fm.createDirectory(at: dir, withIntermediateDirectories: false) }
+        _ = try OutputTransaction(destination: staleRoot.appendingPathComponent("x.mp4"), overwrite: false)
+        expect(!fm.fileExists(atPath: dead.path), "stale staging folder not removed")
+        expect(fm.fileExists(atPath: alive.path), "live staging folder removed")
+        let claimedPath = staleRoot.appendingPathComponent("a.mp4").standardizedFileURL.path
+        expect(uniqueOutputURL(staleRoot.appendingPathComponent("a.mp4"), claimed: [claimedPath]).lastPathComponent == "a 2.mp4", "unique output name")
         print("PASS: preserve output on launch failure, atomic replace, no-overwrite collision, symlink rejection")
     }
 }

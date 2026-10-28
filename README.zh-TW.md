@@ -94,6 +94,9 @@ macmp4-cli --no-gpu --no-reencode x.ts    # 嚴格模式:只做複製類轉換
 | `--no-overwrite` | 輸出檔已存在時略過 |
 | `--no-reencode` | 停用「整檔重新編碼」最後手段 |
 | `--no-gpu` | 改用 CPU x264(不使用 VideoToolbox) |
+| `--force-h264` | 一律輸出 H.264 影片與 AAC 音訊(不可與 `--no-reencode` 並用) |
+
+同一批次中同名的輸出不會互相覆蓋:`a.ts` 與 `a.mkv` 會產生 `a.mp4` 與 `a 2.mp4`。會保留所有音軌;`--out` 的資料夾不存在時會自動建立。
 
 ## 硬體加速說明
 

@@ -42,7 +42,25 @@ final class JobStore: ObservableObject {
     @Published var trimEnabled = false
     @Published var trimStartText = "0"
     @Published var trimEndText = "0"
-    private var activeTrim: ClipTrim?
+    /// Settings are copied once when a batch starts, so toggling the UI mid-batch cannot
+    /// change files already queued, and the worker never reads @Published state.
+    private struct RunOptions {
+        var outputToSource = true
+        var customOutputDir: URL?
+        var overwrite = false
+        var forceH264 = false
+        var allowReencode = true
+        var hardwareAccel = true
+        var trim: ClipTrim?
+    }
+    private var runOptions = RunOptions()
+    private let optionsLock = NSLock()
+    private var activeOptions: RunOptions {
+        get { optionsLock.lock(); defer { optionsLock.unlock() }; return runOptions }
+        set { optionsLock.lock(); defer { optionsLock.unlock() }; runOptions = newValue }
+    }
+    /// Output paths claimed in the current batch (worker queue only).
+    private var claimedOutputs: [UUID: String] = [:]
 
     var trimInputError: String? {
         guard trimEnabled else { return nil }
@@ -128,6 +146,7 @@ final class JobStore: ObservableObject {
         var existing = Set(jobs.map { $0.url.standardizedFileURL.path })
         var newJobs: [Job] = []
         var ignored = 0
+        var capped = false
 
         for u in urls {
             var isDir: ObjCBool = false
@@ -140,7 +159,7 @@ final class JobStore: ObservableObject {
                 ) {
                     var count = 0
                     for case let f as URL in en {
-                        if count >= 2000 { break }
+                        if count >= 2000 { capped = true; break }
                         guard Self.videoExtensions.contains(f.pathExtension.lowercased()) else { continue }
                         let key = f.standardizedFileURL.path
                         if existing.contains(key) { continue }
@@ -171,15 +190,20 @@ final class JobStore: ObservableObject {
             }
         }
         if !newJobs.isEmpty { jobs.append(contentsOf: newJobs) }
-        if ignored > 0 { flash(String(format: L("已忽略 %d 個不支援的檔案"), ignored)) }
+        if capped { flash(L("資料夾內影片超過 2000 個，只加入前 2000 個")) }
+        else if ignored > 0 { flash(String(format: L("已忽略 %d 個不支援的檔案"), ignored)) }
         if autoStart { start() }
     }
 
     func start() {
         guard ffmpeg != nil, ffprobe != nil else { return }
         if !isRunning {
-            do { activeTrim = trimEnabled ? try ClipTrim(startText: trimStartText, endText: trimEndText) : nil }
+            let trim: ClipTrim?
+            do { trim = trimEnabled ? try ClipTrim(startText: trimStartText, endText: trimEndText) : nil }
             catch { flash(error.localizedDescription); return }
+            activeOptions = RunOptions(outputToSource: outputToSource, customOutputDir: customOutputDir,
+                                       overwrite: overwrite, forceH264: forceH264, allowReencode: allowReencode,
+                                       hardwareAccel: hardwareAccel, trim: trim)
         }
         enqueueNew()
         if !isRunning, hasPending() {
@@ -266,6 +290,7 @@ final class JobStore: ObservableObject {
             guard !stopRequested else { setStatus(job, .waiting); break }
             process(job)
         }
+        claimedOutputs.removeAll()
         DispatchQueue.main.async {
             self.isRunning = false
             self.procLock.lock(); self.currentProcess = nil; self.procLock.unlock()
@@ -294,8 +319,10 @@ final class JobStore: ObservableObject {
         guard let ffmpeg, let ffprobe else { return }
         let fm = FileManager.default
         let ext = job.url.pathExtension.lowercased()
-        let trim = activeTrim
-        let encodeH264 = forceH264 || trim != nil
+        let options = activeOptions
+        let trim = options.trim
+        let overwrite = options.overwrite
+        let encodeH264 = options.forceH264 || trim != nil
 
         if trim == nil && (ext == "mp4" || ext == "m4v") {
             setStatus(job, .skipped(L("已是 MP4 格式")))
@@ -303,12 +330,14 @@ final class JobStore: ObservableObject {
         }
 
         let outDir: URL
-        if outputToSource || customOutputDir == nil {
+        if options.outputToSource || options.customOutputDir == nil {
             outDir = job.url.deletingLastPathComponent()
         } else {
-            outDir = customOutputDir!
+            outDir = options.customOutputDir!
         }
-        let outURL = outDir.appendingPathComponent(job.url.deletingPathExtension().lastPathComponent + (trim == nil ? ".mp4" : "_trimmed.mp4"))
+        let wanted = outDir.appendingPathComponent(job.url.deletingPathExtension().lastPathComponent + (trim == nil ? ".mp4" : "_trimmed.mp4"))
+        let others = Set(claimedOutputs.filter { $0.key != job.id }.values)
+        let outURL = uniqueOutputURL(wanted, claimed: others)
 
         if fm.fileExists(atPath: outURL.path) && !overwrite {
             setStatus(job, .skipped(L("輸出檔已存在")))
@@ -334,12 +363,13 @@ final class JobStore: ObservableObject {
         let range: ClipRange?
         do { range = try trim?.resolve(duration: probe.duration) }
         catch { setStatus(job, .failed(error.localizedDescription)); return }
-        let strategies = FF.strategies(for: probe, allowReencode: allowReencode, hardwareAccel: hardwareAccel, forceH264: encodeH264)
+        let strategies = FF.strategies(for: probe, allowReencode: options.allowReencode, hardwareAccel: options.hardwareAccel, forceH264: encodeH264)
         if strategies.isEmpty {
             setStatus(job, .failed(String(format: L("影片編碼 %@ 無法直接封裝成 MP4，請開啟「必要時重新編碼影片」。"), probe.videoCodec ?? "?")))
             return
         }
 
+        claimedOutputs[job.id] = outURL.standardizedFileURL.path
         let transaction: OutputTransaction
         do { transaction = try OutputTransaction(destination: outURL, overwrite: overwrite) }
         catch {

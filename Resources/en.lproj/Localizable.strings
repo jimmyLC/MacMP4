@@ -263,3 +263,4 @@
 "請設定要剪掉的開頭或結尾秒數。" = "Set how many seconds to remove from the start or end.";
 "無法確認影片長度，無法裁切此檔案。" = "Cannot trim this file because its duration could not be determined.";
 "剪掉的總長度必須小於影片長度。" = "The total time removed must be shorter than the video.";
+"資料夾內影片超過 2000 個，只加入前 2000 個" = "Only the first 2000 videos in the folder were added";

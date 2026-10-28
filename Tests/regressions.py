@@ -137,6 +137,65 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
         require(result.returncode == 0, result.stdout + result.stderr)
         print(result.stdout.strip(), flush=True)
     check('localization resources and runtime lookup', localization)
+    def streams_of(path):
+        return json.loads(run([FFPROBE, '-v', 'error', '-show_streams', '-of', 'json', path]).stdout)['streams']
+    def cli_fixes():
+        # all audio tracks kept, HEVC tagged hvc1
+        two = tmp/'twoaudio.ts'
+        made = run([FFMPEG, '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=64x64:rate=30', '-f', 'lavfi', '-i', 'sine=frequency=440', '-f', 'lavfi', '-i', 'sine=frequency=880',
+                    '-map', '0', '-map', '1', '-map', '2', '-t', '1', '-c:v', 'libx265', '-x265-params', 'log-level=error:pools=1:frame-threads=1', '-c:a', 'aac', '-f', 'mpegts', two])
+        require(made.returncode == 0, made.stderr)
+        out = tmp/'fix-out'/'nested'          # --out is created when missing
+        result = run([cli, '--out', out, two])
+        require(result.returncode == 0, result.stdout + result.stderr)
+        streams = streams_of(out/'twoaudio.mp4')
+        require(sum(1 for x in streams if x['codec_type'] == 'audio') == 2, 'second audio track dropped')
+        require(next(x for x in streams if x['codec_type'] == 'video')['codec_tag_string'] == 'hvc1', 'HEVC not tagged hvc1')
+        # same basename, different sources
+        dup = tmp/'dup'
+        dup.mkdir()
+        shutil.copy(normal, dup/'same.ts')
+        require(run([FFMPEG, '-v', 'error', '-i', normal, '-c', 'copy', dup/'same.mkv']).returncode == 0, 'mkv fixture')
+        result = run([cli, '--no-gpu', dup/'same.ts', dup/'same.mkv'])
+        require(result.returncode == 0, result.stdout + result.stderr)
+        require((dup/'same.mp4').is_file() and (dup/'same 2.mp4').is_file(), 'same-name outputs collided')
+        # --out without a value is rejected
+        require(run([cli, normal, '--out']).returncode == 2, '--out without value accepted')
+    check('CLI keeps all audio, hvc1 tag, creates --out, avoids same-name collisions', cli_fixes)
+    def sigint_cleanup():
+        big = tmp/'big.ts'
+        made = subprocess.run([FFMPEG, '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-f', 'lavfi', '-i', 'sine=duration=300',
+                               '-t', '300', '-c:v', 'mpeg2video', '-b:v', '8M', '-c:a', 'mp2', '-f', 'mpegts', str(big)], capture_output=True, text=True, timeout=120)
+        require(made.returncode == 0, made.stderr)
+        work = tmp/'sigint'
+        work.mkdir()
+        proc = subprocess.Popen([str(cli), '--no-gpu', '--out', str(work), str(big)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        import time
+        deadline = time.time() + 15
+        while time.time() < deadline and not list(work.glob('.macmp4-*')):
+            time.sleep(0.1)
+        require(list(work.glob('.macmp4-*')), 'staging folder never appeared')
+        proc.send_signal(signal.SIGINT)
+        proc.wait(timeout=10)
+        time.sleep(0.5)
+        require(not list(work.glob('.macmp4-*')), 'staging folder left after SIGINT')
+        require(proc.returncode == 130, 'unexpected exit status %s' % proc.returncode)
+    check('Ctrl+C removes the staging folder', sigint_cleanup)
+    def exfat_no_overwrite():
+        image = tmp/'exfat.dmg'
+        mount = tmp/'exfat-mount'
+        mount.mkdir()
+        made = subprocess.run(['hdiutil', 'create', '-size', '40m', '-fs', 'ExFAT', '-volname', 'MP4TEST', str(image)], capture_output=True, text=True)
+        attached = made.returncode == 0 and subprocess.run(['hdiutil', 'attach', str(image), '-mountpoint', str(mount)], capture_output=True, text=True).returncode == 0
+        if not attached:
+            print('SKIP: exFAT image unavailable', flush=True)
+            return
+        try:
+            result = run([cli, '--no-gpu', '--no-overwrite', '--out', mount, normal])
+            require(result.returncode == 0 and (mount/'normal.mp4').is_file(), 'exFAT commit failed: ' + result.stdout + result.stderr)
+        finally:
+            subprocess.run(['hdiutil', 'detach', str(mount)], capture_output=True)
+    check('no-overwrite commit works on exFAT', exfat_no_overwrite)
 
 
 
