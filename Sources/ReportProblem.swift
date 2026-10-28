@@ -32,11 +32,19 @@ enum ReportProblem {
     /// URLs ("https://…") are not paths.
     private static let absolutePath = try! NSRegularExpression(pattern: #"(?<![\w<>.:/])/[^\n'"]*?(?=:\s|['"]|$)"#, options: [.anchorsMatchLines])
     private static let email = try! NSRegularExpression(pattern: #"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"#)
+    /// `file:/Users/…` and `file:///Users/…` are paths too; the scheme is dropped so the path rule applies.
+    private static let fileScheme = try! NSRegularExpression(pattern: #"\bfile:(?://)?(?=/)"#)
+    /// Container tags ffmpeg echoes from the customer's video (title, comment, TV service name, …).
+    /// `tail` already drops whole `Metadata:` blocks; this catches a leftover tag line in any other text.
+    private static let metadataTag = try! NSRegularExpression(
+        pattern: #"^[ \t]*(?:title|comment|description|synopsis|artist|album_artist|album|author|composer|performer|publisher|copyright|genre|show|network|location|service_name|service_provider|encoded_by|handler_name)[ \t]*:.*(?:\n|$)"#,
+        options: [.anchorsMatchLines, .caseInsensitive])
 
     /// Removes what identifies the customer or their files: the input's path, every other
     /// absolute path (the extension is kept, since it matters for diagnosis) and email addresses.
     static func redact(_ text: String, input: URL? = nil) -> String {
-        var out = text
+        var out = metadataTag.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        out = fileScheme.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "")
         if let input, !input.path.isEmpty {
             let ext = input.pathExtension
             out = out.replacingOccurrences(of: input.path, with: ext.isEmpty ? "<input>" : "<input>.\(ext)")
@@ -56,10 +64,28 @@ enum ReportProblem {
         return email.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "<email>")
     }
 
+    /// Drops every `Metadata:` block (the line and the more deeply indented tag lines under it).
+    /// ffmpeg prints the video's own tags there, which can carry a title, a name or a place.
+    static func withoutMetadata(_ text: String) -> String {
+        var skipping: Int?
+        var kept: [Substring] = []
+        for line in text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
+            let indent = line.prefix { $0 == " " || $0 == "\t" }.count
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if let level = skipping {
+                if trimmed.isEmpty || indent > level { continue }
+                skipping = nil
+            }
+            if trimmed == "Metadata:" { skipping = indent; continue }
+            kept.append(line)
+        }
+        return kept.joined(separator: "\n")
+    }
+
     /// The last `lines` non-empty lines, capped at `maxCharacters` from the end.
     /// The end of ffmpeg's output is where the actual failure is reported.
     static func tail(_ text: String, lines: Int = 12, maxCharacters: Int = maxLogCharacters) -> String {
-        let kept = text.split(whereSeparator: \.isNewline)
+        let kept = withoutMetadata(text).split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
             .suffix(lines)

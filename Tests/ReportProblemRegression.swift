@@ -20,6 +20,28 @@ struct ReportProblemRegression {
         check(clean.contains("https://example.com/help") && clean.contains("and/or") && clean.contains("1/2"), "redaction mangled non-path text: \(clean)")
         check(ReportProblem.redact("plain text, no paths") == "plain text, no paths", "plain text must be unchanged")
 
+        // Paths written as file: URLs are paths too.
+        let urls = ReportProblem.redact("open 'file:/Users/amy/Movies/a.ts' and file:///Users/amy/b.ts failed")
+        check(!urls.contains("amy") && !urls.contains("Users") && urls.contains("<path>.ts"), "file: path leaked: \(urls)")
+
+        // Tags echoed from the video itself never reach the report, even when the whole output is short.
+        let ffmpegOutput = """
+        Input #0, matroska,webm, from '/Users/amy/Movies/clip.mkv':
+          Metadata:
+            title           : Amy Wedding Private Video
+            COMMENT         : Taipei Office Recording
+          Duration: 00:00:02.02, start: 0.000000, bitrate: 154 kb/s
+          Stream #0:0: Video: h264 (High), 160x120
+            Metadata:
+              ENCODER         : Lavc63.1.102 libx264
+        [out#0/mp4 @ 0x1] Error opening output /nonexistent/dir/output.mp4: No such file or directory
+        """
+        let sent = ReportProblem.redact(ReportProblem.tail(ffmpegOutput, lines: 20), input: URL(fileURLWithPath: "/Users/amy/Movies/clip.mkv"))
+        check(!sent.contains("Wedding") && !sent.contains("Taipei") && !sent.contains("amy"), "video tags leaked: \(sent)")
+        check(sent.contains("Stream #0:0: Video: h264") && sent.contains("Error opening output <path>.mp4: No such file or directory"), "useful lines were lost: \(sent)")
+        let loose = ReportProblem.redact("service_name    : 公視HD\nreal error line")
+        check(!loose.contains("公視") && loose.contains("real error line"), "leftover tag line leaked: \(loose)")
+
         // The tail keeps the end of the output, where ffmpeg reports the failure.
         let long = (1...50).map { "line \($0)" }.joined(separator: "\n") + "\n\n  \nError: the real reason"
         let tail = ReportProblem.tail(long, lines: 3)
