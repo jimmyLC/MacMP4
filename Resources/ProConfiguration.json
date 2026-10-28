@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "apiBaseURL": "https://macmp4-payments.acsd68500.workers.dev",
+  "environment": "production",
+  "publicKey": "BErHmZJ5FKwvUwihs9QtXodfSKTBa/Oa19clB3TE2QwU2E4fcrsdM04FHc7MXlGz0ggEAT/R3zUqdA1ie2MJLAs="
+}

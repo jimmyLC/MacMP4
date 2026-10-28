@@ -113,6 +113,12 @@ with tempfile.TemporaryDirectory(prefix='macmp4-regressions-') as folder:
     check('GUI trim regression suite', trim_regression)
     check('tool installer regression suite', lambda: swift_regression('tool-setup-tests', [ROOT/'Sources/Model.swift', ROOT/'Sources/ToolSetup.swift', ROOT/'Tests/ToolSetupRegression.swift'], []))
     check('appearance entitlement regression suite', lambda: swift_regression('appearance-tests', [ROOT/'Sources/AppAccess.swift', ROOT/'Tests/AppearanceRegression.swift'], []))
+    def license_regression():
+        fixture = tmp/'license-fixture.json'
+        generated = run(['node', ROOT/'payments/scripts/license-fixtures.mjs', fixture])
+        require(generated.returncode == 0, generated.stderr)
+        swift_regression('license-tests', [ROOT/'Sources/AppAccess.swift', ROOT/'Sources/ProLicense.swift', ROOT/'Tests/ProLicenseRegression.swift'], [fixture])
+    check('signed Pro license and payment client regression suite', license_regression)
     def localization():
         expected = json.loads(run(['plutil', '-convert', 'json', '-o', '-', ROOT/'Resources/en.lproj/Localizable.strings']).stdout)
         keys = set()

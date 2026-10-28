@@ -1,3 +1,10 @@
 build/
 .DS_Store
 *.xcodeproj
+node_modules/
+.wrangler/
+.dev.vars*
+.env*
+!.env.example
+*.secret.json
+payments/ProConfiguration.*.public.json
