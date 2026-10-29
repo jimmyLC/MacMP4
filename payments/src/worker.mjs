@@ -97,6 +97,11 @@ async function orderStatus(request,env,id) {
   const hash=await sha256(bearer(request));
   const row=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND access_hash=? AND environment=?').bind(id,hash,env.PAYMENT_ENV).first();
   if(!row) fail(404,'order_not_found');
+  if(row.status==='pending' && row.session_id) {
+    try { await reconcile(env,configuration(env),row); } catch {} // 備援失敗不影響查詢，下次再試。
+    const fresh=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND environment=?').bind(row.id,env.PAYMENT_ENV).first();
+    if(fresh) return json(await paidResult(fresh,env));
+  }
   return json(await paidResult(row,env));
 }
 function html(content, action="'none'") {
@@ -145,6 +150,32 @@ async function checkout(request,env,cfg,id,token) {
   const target=row.session_url ?? await createSession(request,env,cfg,row);
   return new Response(null,{status:302,headers:{...HEADERS,Location:target}});
 }
+// 實測正式 API（2026-10-29）：Session 付款的 referenceOrderId 是 SHOPLINE 自己的 RL… 編號；
+// 我們的訂單編號在 order.customer.referenceCustomerId，且 sessionId 會對應。金額在 payment.paidAmount。
+function orderCandidates(data) {
+  return [data?.order?.customer?.referenceCustomerId, data?.referenceOrderId, data?.order?.referenceOrderId]
+    .filter(value=>typeof value==='string' && /^[A-Z0-9]{20}$/.test(value));
+}
+// 不單信通知內容：向 SHOPLINE 查詢該筆付款，確認屬於這張訂單、狀態成功、金額 NT$90，才入帳。
+async function settle(env,cfg,row,tradeOrderId) {
+  if(row.status!=='pending') return;
+  if(!/^[A-Za-z0-9_-]{1,64}$/.test(tradeOrderId ?? '')) return;
+  const trade=await shoplineCall(env,cfg,'/api/v1/trade/payment/get',{tradeOrderId});
+  const paid=trade.payment?.paidAmount ?? trade.paidAmount ?? {};
+  const mine=(row.session_id && trade.sessionId===row.session_id) || trade.order?.customer?.referenceCustomerId===row.id;
+  if(trade.status!=='SUCCEEDED' || !mine || (trade.tradeOrderId && trade.tradeOrderId!==tradeOrderId)
+    || paid.value!==AMOUNT_MINOR || paid.currency!=='TWD') return;
+  await env.DB.prepare("UPDATE orders SET status='paid',paid_at=?,provider_trade_no=? WHERE id=? AND environment=? AND status='pending'")
+    .bind(Math.floor(Date.now()/1000),tradeOrderId,row.id,env.PAYMENT_ENV).run();
+}
+// Webhook 沒到時的備援：App 查詢待付款訂單時，主動向 SHOPLINE 查 session。
+async function reconcile(env,cfg,row) {
+  if(row.status!=='pending' || !row.session_id) return;
+  const session=await shoplineCall(env,cfg,'/api/v1/trade/sessions/query',{sessionId:row.session_id});
+  if(session.status!=='SUCCEEDED') return;
+  const success=(session.paymentDetails ?? []).find(item=>item.paymentStatus==='SUCCEEDED' || item.status==='SUCCEEDED');
+  if(success) await settle(env,cfg,row,success.tradeOrderId);
+}
 async function webhook(request,env,cfg) {
   // 通知規格：2026-10-29 shopline-payments-skill references/webhook.md。必須用原始 body 驗簽。
   const timestamp=request.headers.get('timestamp') ?? '', sign=request.headers.get('sign');
@@ -154,17 +185,12 @@ async function webhook(request,env,cfg) {
   let event; try { event=JSON.parse(raw); } catch { fail(400,'invalid_json'); }
   if(event?.type!=='trade.succeeded') return text('OK'); // 其他事件只確認收到，不改變授權狀態。
   const data=event.data ?? {};
-  const row=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND environment=?').bind(String(data.referenceOrderId ?? ''),env.PAYMENT_ENV).first();
-  if(!row || row.status==='revoked') return text('OK');
-  if(!/^[A-Za-z0-9_-]{1,64}$/.test(data.tradeOrderId ?? '')) return text('OK');
-  if(row.status==='paid') return text('OK'); // 重送：已付款不重發授權。
-  // 不單信 Webhook 內容：再向 SHOPLINE 查詢，確認訂單、金額與狀態。
-  const trade=await shoplineCall(env,cfg,'/api/v1/trade/payment/get',{tradeOrderId:data.tradeOrderId});
-  const paid=trade.paidAmount ?? {};
-  if(trade.status!=='SUCCEEDED' || trade.referenceOrderId!==row.id || trade.tradeOrderId!==data.tradeOrderId
-    || paid.value!==AMOUNT_MINOR || paid.currency!=='TWD') return text('OK');
-  await env.DB.prepare("UPDATE orders SET status='paid',paid_at=?,provider_trade_no=? WHERE id=? AND environment=? AND status='pending'")
-    .bind(Math.floor(Date.now()/1000),data.tradeOrderId,row.id,env.PAYMENT_ENV).run();
+  let row=null;
+  for(const id of orderCandidates(data)) { row=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND environment=?').bind(id,env.PAYMENT_ENV).first(); if(row) break; }
+  const sessionId=data.sessionId ?? data.order?.sessionId;
+  if(!row && typeof sessionId==='string') row=await env.DB.prepare('SELECT * FROM orders WHERE session_id=? AND environment=?').bind(sessionId,env.PAYMENT_ENV).first();
+  if(!row || row.status!=='pending') return text('OK'); // 找不到、已付款（重送）或已撤銷：只確認收到。
+  await settle(env,cfg,row,data.tradeOrderId);
   return text('OK');
 }
 async function activate(request,env,cfg) {

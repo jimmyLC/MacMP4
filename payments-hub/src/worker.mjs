@@ -26,8 +26,10 @@ export default {
     if (raw===null) return reply('invalid body',400);
     if (!/^\d{13}$/.test(timestamp) || Math.abs(Date.now()-Number(timestamp))>5*60*1000) return reply('timestamp',401);
     if (!env.SHOPLINE_SIGN_KEY || !await verifyWebhookSignature(timestamp,raw,sign,env.SHOPLINE_SIGN_KEY)) return reply('signature',401);
-    let id=''; try { id=String(JSON.parse(raw)?.data?.referenceOrderId ?? ''); } catch { return reply('invalid json',400); }
-    const binding = ROUTES[id[0]];
+    let data; try { data=JSON.parse(raw)?.data; } catch { return reply('invalid json',400); }
+    // SHOPLINE 的 referenceOrderId 是它自己的 RL… 編號；我們的訂單編號在 order.customer.referenceCustomerId。
+    const ids=[data?.order?.customer?.referenceCustomerId, data?.referenceOrderId, data?.order?.referenceOrderId].map(v=>String(v ?? ''));
+    const binding = ids.map(id=>ROUTES[id[0]]).find(Boolean);
     if (!binding || !env[binding]) return reply('OK'); // 不是我們認得的產品：確認收到，不重試。
     // 原樣轉送（含 timestamp、sign），產品 Worker 以同一把 Sign Key 再驗一次。
     const forwarded = await env[binding].fetch('https://internal/shopline/webhook',

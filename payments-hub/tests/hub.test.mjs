@@ -28,3 +28,7 @@ test('產品端失敗時回 502 讓 SHOPLINE 重送；其他路徑與方法 404'
   assert.equal((await worker.fetch(new Request('https://pay.example.com/x',{method:'POST'}),env())).status,404);
   assert.equal((await worker.fetch(new Request('https://pay.example.com/health'),env())).status,200);
 });
+test('SHOPLINE 的 RL 編號不影響路由：用 order.customer.referenceCustomerId 判斷產品',async()=>{
+  const e=env(),body=JSON.stringify({type:'trade.succeeded',data:{referenceOrderId:'RL0126102900977667489309682366',order:{customer:{referenceCustomerId:'MABC'}}}});
+  assert.equal((await hook(e,{body})).status,200);assert.equal(e.seen.length,1);
+});

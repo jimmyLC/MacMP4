@@ -22,26 +22,34 @@ async function setup(environment='staging') {
 // 模擬 SHOPLINE API；記錄每次呼叫，供斷言標頭與內容。
 const calls=[];
 let tradeReply=null;
+let sessionReply=null;
 globalThis.fetch=async (url,init)=>{
   const body=JSON.parse(init.body);calls.push({url,headers:init.headers,body});
   const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
   if(url.endsWith('/api/v1/trade/sessions/create'))
     return json({sessionId:'se_'+body.referenceId,referenceId:body.referenceId,status:'CREATED',sessionUrl:'https://api-sandbox.shoplinepayments.com/checkout/session?sessionToken=abc'});
+  if(url.endsWith('/api/v1/trade/sessions/query')) return sessionReply?json(sessionReply(body)):json({code:'1016',msg:'Record does not exist'},400);
   if(url.endsWith('/api/v1/trade/payment/get')) return tradeReply?json(tradeReply(body)):json({code:'1004',msg:'Param error'},400);
   throw new Error('unexpected fetch '+url);
 };
 const req=(path,options={})=>new Request('https://pay.example.com'+path,options);
 const post=(path,data,headers={})=>req(path,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(data)});
 async function order(env,extra={}) {
+  env0=env;
   const data={email:'Buyer@example.com',method:'ApplePay',accessToken:randomToken(),...extra};
   const r=await worker.fetch(post('/v1/orders',data),env);
   assert.equal(r.status,201,await r.clone().text());
   return {...data,...await r.json()};
 }
-const trade=(o,extra={})=>({tradeOrderId:'T'+o.orderId,referenceOrderId:o.orderId,status:'SUCCEEDED',paidAmount:{value:9000,currency:'TWD'},...extra});
+// 實測正式 API 的形狀：referenceOrderId 是 SHOPLINE 的 RL… 編號，我們的編號在 order.customer.referenceCustomerId。
+const sessionOf=o=>env0.DB.raw.prepare('SELECT session_id FROM orders WHERE id=?').get(o.orderId)?.session_id;
+let env0=null;
+const trade=(o,extra={})=>({tradeOrderId:'T'+o.orderId,referenceOrderId:'RL0126102900977667489309682366',status:'SUCCEEDED',sessionId:sessionOf(o),
+  order:{amount:{value:9000,currency:'TWD'},customer:{referenceCustomerId:o.orderId},referenceOrderId:'RL0126102900977667489309682366'},
+  payment:{paidAmount:{value:9000,currency:'TWD'}},...extra});
 async function webhook(env,o,{type='trade.succeeded',data={},timestamp=String(Date.now()),sign=true,reply}={}) {
   tradeReply=reply===undefined?t=>trade(o,{tradeOrderId:t.tradeOrderId}):reply;
-  const raw=JSON.stringify({id:'evt1',type,created:Date.now(),data:{tradeOrderId:'T'+o.orderId,referenceOrderId:o.orderId,...data}});
+  const raw=JSON.stringify({id:'evt1',type,created:Date.now(),data:{tradeOrderId:'T'+o.orderId,referenceOrderId:'RL0126102900977667489309682366',order:{customer:{referenceCustomerId:o.orderId}},...data}});
   const signature=sign?await hmacHex(SIGN_KEY,`${timestamp}.${raw}`):'0'.repeat(64);
   return worker.fetch(req('/shopline/webhook',{method:'POST',headers:{'Content-Type':'application/json',timestamp,sign:signature},body:raw}),env);
 }
@@ -100,7 +108,7 @@ test('未付款、前景跳轉、偽造簽章／過期時間／金額／訂單�
   assert.equal((await worker.fetch(post('/v1/licenses/activate',{email:o.email,serial:'MP4-'+'A'.repeat(40)}),env)).status,403);
   assert.equal((await webhook(env,o,{sign:false})).status,401);
   assert.equal((await webhook(env,o,{timestamp:String(Date.now()-10*60*1000)})).status,401);
-  for(const reply of [t=>trade(o,{paidAmount:{value:100,currency:'TWD'}}),t=>trade(o,{referenceOrderId:'MOTHER'}),
+  for(const reply of [t=>trade(o,{payment:{paidAmount:{value:100,currency:'TWD'}}}),t=>trade(o,{sessionId:'se_other',order:{customer:{referenceCustomerId:'MOTHERORDER0000000000'}}}),
     t=>trade(o,{status:'FAILED'}),t=>trade(o,{tradeOrderId:'other'}),null]) {
     if(reply===null) assert.equal((await webhook(env,o,{reply})).status,502);
     else assert.equal((await webhook(env,o,{reply})).status,200);
@@ -152,4 +160,19 @@ test('資料庫失敗不確認通知；只清理未付款過期訂單',async()=>
   const paid=await order(env);await webhook(env,paid);env.DB.raw.prepare('UPDATE orders SET created_at=0').run();await worker.scheduled(null,env);
   assert.equal(env.DB.raw.prepare('SELECT count(*) AS n FROM orders').get().n,1);
   env.DB={prepare(){throw new Error('database down');}};assert.equal((await webhook(env,paid)).status,503);
+});
+test('Webhook 沒到時：App 查詢待付款訂單會向 SHOPLINE 補查並入帳',async()=>{
+  const env=await setup(),o=await order(env,{method:'Credit'});
+  await worker.fetch(new Request(o.checkoutURL),env); // 建立 session
+  assert.deepEqual(await (await status(env,o)).json(),{status:'pending'}); // session 尚未成功
+  sessionReply=body=>({sessionId:body.sessionId,status:'SUCCEEDED',paymentDetails:[{paymentMethod:'CreditCard',tradeOrderId:'T'+o.orderId,paymentStatus:'SUCCEEDED'}]});
+  tradeReply=t=>trade(o,{tradeOrderId:t.tradeOrderId});
+  const result=await (await status(env,o)).json();
+  assert.equal(result.status,'paid');assert.ok(result.licenseToken);
+  // 金額不符時不入帳。
+  const other=await order(env,{method:'Credit'});await worker.fetch(new Request(other.checkoutURL),env);
+  tradeReply=t=>trade(other,{tradeOrderId:t.tradeOrderId,payment:{paidAmount:{value:1,currency:'TWD'}}});
+  sessionReply=body=>({sessionId:body.sessionId,status:'SUCCEEDED',paymentDetails:[{tradeOrderId:'T'+other.orderId,paymentStatus:'SUCCEEDED'}]});
+  assert.deepEqual(await (await status(env,other)).json(),{status:'pending'});
+  sessionReply=null;
 });
