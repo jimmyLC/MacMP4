@@ -68,6 +68,7 @@ final class PaymentMockProtocol: URLProtocol {
         client.dismissPurchaseCelebration()
         _ = await client.checkPayment()
         precondition(!client.showPurchaseCelebration, "repeated check replayed celebration")
+        let licensedData=vault.data
         PaymentMockProtocol.handler={ _ in throw URLError(.notConnectedToInternet) }
         let offlineAccess=AppAccess(defaults:defaults)
         let offline=ProLicenseStore(configuration:config,vault:vault,session:session)
@@ -76,12 +77,48 @@ final class PaymentMockProtocol: URLProtocol {
         PaymentMockProtocol.handler={ _ in (409,response(["error":"license_revoked"])) }
         await offline.restore(email:"buyer@example.com",serial:client.serial)
         precondition(!offlineAccess.isPro,"revoked license retained Pro")
+        // 一組序號只能一台電腦使用：背景檢查帶裝置識別但不搶佔；被其他電腦取代後變回 Free，並保留重新啟用的機會。
+        func bodyOf(_ request:URLRequest) -> [String:String] {
+            guard let stream=request.httpBodyStream else { return [:] }
+            stream.open(); defer { stream.close() }
+            var data=Data(); var buffer=[UInt8](repeating:0,count:4096)
+            while stream.hasBytesAvailable { let n=stream.read(&buffer,maxLength:buffer.count); if n<=0 { break }; data.append(buffer,count:n) }
+            return (try? JSONSerialization.jsonObject(with:data) as? [String:String]) ?? [:]
+        }
+        let deviceVault=MemoryLicenseVault(); deviceVault.data=licensedData
+        var activateBodies:[[String:String]]=[]
+        var replaced=true
+        PaymentMockProtocol.handler={ request in
+            switch request.url!.path {
+            case "/v1/config": return (200,response(["environment":"production","amount":90,"currency":"TWD","checkoutEnabled":true,"methods":["Credit"]]))
+            default:
+                activateBodies.append(bodyOf(request))
+                if replaced && bodyOf(request)["takeover"]=="false" { return (409,response(["error":"device_replaced"])) }
+                return (200,response(["status":"paid","email":"buyer@example.com","serial":"MP4-"+String(repeating:"A",count:40),"licenseToken":fixture["token"]!]))
+            }
+        }
+        let deviceAccess=AppAccess(defaults:defaults)
+        let deviceStore=ProLicenseStore(configuration:config,vault:deviceVault,session:session,deviceID:String(repeating:"D",count:43))
+        await deviceStore.resume(access:deviceAccess)
+        precondition(!deviceAccess.isPro,"replaced device kept Pro")
+        precondition(activateBodies.first?["deviceId"]==String(repeating:"D",count:43) && activateBodies.first?["takeover"]=="false","background check must not take over")
+        replaced=false
+        await deviceStore.restore(email:"buyer@example.com",serial:"MP4-"+String(repeating:"A",count:40))
+        precondition(deviceAccess.isPro && activateBodies.last?["takeover"]=="true","explicit restore must take over")
+        PaymentMockProtocol.handler={ request in
+            if request.url!.path=="/v1/config" { return (200,response(["environment":"production","amount":90,"currency":"TWD","checkoutEnabled":true,"methods":["Credit"]])) }
+            return (429,response(["error":"device_change_limited"]))
+        }
+        let limitedStore=ProLicenseStore(configuration:config,vault:MemoryLicenseVault(),session:session,deviceID:String(repeating:"E",count:43))
+        await limitedStore.resume(access:AppAccess(defaults:defaults))
+        await limitedStore.restore(email:"buyer@example.com",serial:"MP4-"+String(repeating:"A",count:40))
+        precondition(limitedStore.message==LicenseError.request("device_change_limited").localizedDescription,"switch limit message missing")
         let failedVault=MemoryLicenseVault();failedVault.failWrites=true
         PaymentMockProtocol.handler={ _ in (200,response(["environment":"production","amount":90,"currency":"TWD","checkoutEnabled":true,"methods":["Credit"]])) }
         let storageFailure=ProLicenseStore(configuration:config,vault:failedVault,session:session)
         await storageFailure.resume(access:AppAccess(defaults:defaults))
         let failureURL=await storageFailure.purchase(email:"buyer@example.com",method:"Credit")
         precondition(failureURL==nil && failedVault.data==nil)
-        print("PASS: WebCrypto/CryptoKit signature compatibility, forged/staging/future/email rejection, pending/paid flow, recovery before create, offline lifetime, revocation, Keychain failure")
+        print("PASS: WebCrypto/CryptoKit signature compatibility, forged/staging/future/email rejection, pending/paid flow, recovery before create, offline lifetime, revocation, single-device takeover and limit, Keychain failure")
     }
 }

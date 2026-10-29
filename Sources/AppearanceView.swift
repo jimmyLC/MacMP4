@@ -198,6 +198,8 @@ struct SuperThanksView: View {
                     Text(license.serial).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                     Text(L("請保存 Email 與序號，重新安裝時可恢復 Pro。"))
                         .font(.caption).foregroundStyle(.secondary)
+                    Text(L("同一組序號同一時間只能在一台電腦使用；換電腦後，這台會變回 Free。"))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
                 TextField(L("購買 Email"), text: $email).textFieldStyle(.roundedBorder)
@@ -234,6 +236,8 @@ struct SuperThanksView: View {
                         .buttonStyle(.link).disabled(license.isBusy)
                 } else {
                     TextField(L("Pro 序號"), text: $serial).textFieldStyle(.roundedBorder)
+                    Text(L("在這台啟用後，原本使用的電腦會在下次連線時變回 Free；24 小時內只能更換一次。"))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Button(L("啟用 Pro")) { Task { await license.restore(email: email, serial: serial) } }
                         .buttonStyle(.borderedProminent)
                         .disabled(!license.isConfigured || license.isBusy || email.isEmpty || serial.isEmpty)

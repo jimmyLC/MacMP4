@@ -305,3 +305,8 @@
 "回報問題…" = "Report a Problem…";
 "回報問題" = "Report a Problem";
 "開啟回報表單。會附上版本與這支影片的錯誤紀錄（已遮蔽檔名與路徑），送出前可以檢視。" = "Opens the report form with the app version and this video's error log (file names and paths removed). You can review everything before sending.";
+"此序號已在另一台電腦啟用，這台已變回 Free。要改在這台使用，請在「已有序號？恢復 Pro」輸入 Email 與序號。" = "This serial is now active on another Mac, so this one is back to Free. To use it here, choose \"Have a serial? Restore Pro\" and enter your email and serial.";
+"24 小時內只能更換一次使用的電腦，請稍後再試，或聯絡客服。" = "You can switch computers only once every 24 hours. Please try again later or contact support.";
+"請先更新 MacMP4 到最新版本。" = "Please update MacMP4 to the latest version.";
+"同一組序號同一時間只能在一台電腦使用；換電腦後，這台會變回 Free。" = "One serial works on one Mac at a time. After you switch computers, this one goes back to Free.";
+"在這台啟用後，原本使用的電腦會在下次連線時變回 Free；24 小時內只能更換一次。" = "After you activate here, the Mac you used before goes back to Free the next time it connects. You can switch once every 24 hours.";

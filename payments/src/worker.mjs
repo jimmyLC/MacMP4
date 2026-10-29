@@ -92,6 +92,59 @@ async function paidResult(row,env) {
   const data=await unseal(row.private_data,env.DATA_KEY);
   return {status:'paid', email:data.email, serial:data.serial, licenseToken:await signLicense(row,data.email,env.LICENSE_SIGNING_JWK)};
 }
+const deviceValid = value => typeof value==='string' && /^[A-Za-z0-9_-]{22,64}$/.test(value);
+const changes = result => result?.meta?.changes ?? result?.changes ?? 0;
+const DEVICE_CHANGE_SECONDS = 24*3600;
+/** 一組序號同時只有一台有效裝置。takeover 為使用者明確按下「在這台啟用」；啟動時的背景檢查不會搶走。 */
+async function bindDevice(env,row,deviceId,takeover) {
+  const hash=await sha256(deviceId), now=Math.floor(Date.now()/1000);
+  if(row.active_device_hash===hash) return;
+  if(!row.active_device_hash) {
+    const bound=await env.DB.prepare('UPDATE orders SET active_device_hash=? WHERE id=? AND active_device_hash IS NULL').bind(hash,row.id).run();
+    if(changes(bound)===1) return;
+    row=await env.DB.prepare('SELECT * FROM orders WHERE id=?').bind(row.id).first();
+    if(row.active_device_hash===hash) return;
+  }
+  if(!takeover) fail(409,'device_replaced');
+  const moved=await env.DB.prepare('UPDATE orders SET active_device_hash=?,device_changed_at=? WHERE id=? AND active_device_hash IS NOT NULL AND active_device_hash!=? AND (device_changed_at IS NULL OR device_changed_at<=?)')
+    .bind(hash,now,row.id,hash,now-DEVICE_CHANGE_SECONDS).run();
+  if(changes(moved)!==1) fail(429,'device_change_limited');
+}
+function serialEmail(serial) {
+  const subject='你的 MacMP4 Pro 序號';
+  const text=`感謝你支持 MacMP4！Pro 已在你付款的電腦上自動啟用。
+
+你的序號：
+${serial}
+
+換電腦或重灌時：
+1. 在新電腦安裝 MacMP4，打開「超級感謝」。
+2. 選「已有序號？恢復 Pro」，輸入購買時使用的 Email 與上面的序號。
+3. 啟用後，原本的電腦會在下次連線時變回 Free。同一組序號同一時間只能有一台電腦使用；24 小時內只能更換一次。
+
+請妥善保存這封信。任何人拿到 Email 與序號都能啟用，請不要公開分享。
+
+需要協助請直接回覆這封信，或寄到 contact@jimmy-tools.com。
+MacMP4 · jimmy-tools.com/MacMP4/`;
+  const html=`<div style="font:16px/1.7 -apple-system,system-ui,sans-serif;color:#1d2433;max-width:32rem"><p>感謝你支持 MacMP4！Pro 已在你付款的電腦上自動啟用。</p><p>你的序號：</p><p style="font:600 18px ui-monospace,Menlo,monospace;background:#f4f6f9;padding:14px 16px;border-radius:10px;letter-spacing:.5px">${serial}</p><p><b>換電腦或重灌時</b></p><ol><li>在新電腦安裝 MacMP4，打開「超級感謝」。</li><li>選「已有序號？恢復 Pro」，輸入購買時使用的 Email 與上面的序號。</li><li>啟用後，原本的電腦會在下次連線時變回 Free。同一組序號同一時間只能有一台電腦使用；24 小時內只能更換一次。</li></ol><p style="color:#5b6472;font-size:14px">請妥善保存這封信。任何人拿到 Email 與序號都能啟用，請不要公開分享。<br>需要協助請直接回覆這封信，或寄到 contact@jimmy-tools.com。</p></div>`;
+  return {subject,text,html};
+}
+/** 寄序號信。失敗不影響授權；email_sent_at 未設定時，排程會重試。 */
+export async function sendSerialMail(env,row) {
+  if(!env.EMAIL || row.status!=='paid' || row.email_sent_at) return false;
+  try {
+    const {email,serial}=await unseal(row.private_data,env.DATA_KEY);
+    await env.EMAIL.send({to:email,from:{email:env.MAIL_FROM ?? 'contact@jimmy-tools.com',name:'MacMP4'},replyTo:env.MAIL_FROM ?? 'contact@jimmy-tools.com',...serialEmail(serial)});
+    await env.DB.prepare('UPDATE orders SET email_sent_at=? WHERE id=? AND email_sent_at IS NULL').bind(Math.floor(Date.now()/1000),row.id).run();
+    return true;
+  } catch { return false; }
+}
+async function firstDevice(request,env,row) {
+  const result=await paidResult(row,env);
+  const device=request.headers.get('X-Device-Id');
+  if(result.status==='paid' && deviceValid(device) && !row.active_device_hash) await bindDevice(env,row,device,false);
+  return result;
+}
 async function orderStatus(request,env,id) {
   await rateLimit(request,env,'status',90);
   const hash=await sha256(bearer(request));
@@ -100,9 +153,9 @@ async function orderStatus(request,env,id) {
   if(row.status==='pending' && row.session_id) {
     try { await reconcile(env,configuration(env),row); } catch {} // 備援失敗不影響查詢，下次再試。
     const fresh=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND environment=?').bind(row.id,env.PAYMENT_ENV).first();
-    if(fresh) return json(await paidResult(fresh,env));
+    if(fresh) return json(await firstDevice(request,env,fresh));
   }
-  return json(await paidResult(row,env));
+  return json(await firstDevice(request,env,row));
 }
 function html(content, action="'none'") {
   return new Response(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex,nofollow"><title>MacMP4 超級感謝</title><style>body{font:17px system-ui;max-width:32rem;margin:12vh auto;padding:24px;color:#1d2433;background:#f4f6f9}button{padding:14px 24px;background:#0061cc;color:white;border:0;border-radius:12px;font:inherit}a{color:#0061cc}</style><main>${content}</main></html>`,
@@ -166,7 +219,8 @@ async function settle(env,cfg,row,tradeOrderId) {
   if(trade.status!=='SUCCEEDED' || !mine || (trade.tradeOrderId && trade.tradeOrderId!==tradeOrderId)
     || paid.value!==AMOUNT_MINOR || paid.currency!=='TWD') return;
   await env.DB.prepare("UPDATE orders SET status='paid',paid_at=?,provider_trade_no=? WHERE id=? AND environment=? AND status='pending'")
-    .bind(Math.floor(Date.now()/1000),tradeOrderId,row.id,env.PAYMENT_ENV).run();
+    .bind(Math.floor(Date.now()/1000),tradeOrderId,row.id,env.PAYMENT_ENV).run()
+    .then(async result=>{ if(changes(result)===1) await sendSerialMail(env,await env.DB.prepare('SELECT * FROM orders WHERE id=?').bind(row.id).first()); });
 }
 // Webhook 沒到時的備援：App 查詢待付款訂單時，主動向 SHOPLINE 查 session。
 async function reconcile(env,cfg,row) {
@@ -200,7 +254,10 @@ async function activate(request,env,cfg) {
   const row=await env.DB.prepare('SELECT * FROM orders WHERE email_hash=? AND serial_hash=? AND environment=?')
     .bind(await keyedHash(env.LOOKUP_KEY,`email:${email}`),await sha256(serial),env.PAYMENT_ENV).first();
   if(!row || row.status==='pending') fail(403,'invalid_license');
-  return json(await paidResult(row,env));
+  const result=await paidResult(row,env); // 已撤銷會在此回 409。
+  if(deviceValid(data.deviceId)) await bindDevice(env,row,data.deviceId,data.takeover===true || data.takeover==='true');
+  else if(env.REQUIRE_DEVICE==='true') fail(426,'update_required'); // 舊版 App（無裝置識別）過渡期可通過，之後以 REQUIRE_DEVICE 關閉。
+  return json(result);
 }
 export async function handle(request,env) {
   const url=new URL(request.url),path=url.pathname;
@@ -216,7 +273,7 @@ export async function handle(request,env) {
   const page=path.match(/^\/checkout\/([A-Z0-9]{20})$/);
   if(page && request.method==='GET') return checkout(request,env,cfg,page[1],url.searchParams.get('token'));
   if(path==='/thanks' && request.method==='GET') return html('<h1>請回到 MacMP4</h1><p>App 會向伺服器確認付款結果，再自動啟用 Pro。這個頁面不會直接啟用授權。</p><p>尚未啟用時，請在 App 按「檢查付款」。</p>');
-  if(path==='/privacy' && request.method==='GET') return html('<h1>MacMP4 Pro 隱私說明</h1><p>開發者：JimmyLC。購買時提供的 Email 與序號會加密保存於 Cloudflare D1，僅用於授權、重裝啟用與客服。付款資料由 SHOPLINE Payments 處理，MacMP4 不儲存卡號。影片保留於你的電腦，不會上傳。</p><p>已付款與撤銷訂單保留，以支援終身授權及交易核對；未付款訂單於 30 天後刪除。流量限制用的 IP 雜湊桶最多保留 2 天。Cloudflare 與 SHOPLINE Payments 另依其政策處理連線資料。</p><p>請妥善保存 Email 與序號，任何持有兩者的人皆可恢復授權。本系統不提供公開 Email 查序號。</p><p>存取、更正、刪除資料或退款需求：<a href="mailto:acsd6850@hotmail.com">acsd6850@hotmail.com</a>。刪除授權資料將失去線上恢復能力。</p>');
+  if(path==='/privacy' && request.method==='GET') return html('<h1>MacMP4 Pro 隱私說明</h1><p>開發者：JimmyLC。購買時提供的 Email 與序號會加密保存於 Cloudflare D1，僅用於授權、重裝啟用與客服；購買完成時會寄一封含序號的信到你的 Email。付款資料由 SHOPLINE Payments 處理，MacMP4 不儲存卡號。影片保留於你的電腦，不會上傳。為了「一組序號同時只能在一台電腦使用」，App 會送出這台 Mac 的識別碼雜湊（無法還原成硬體資料），僅用於判斷目前使用中的電腦。</p><p>已付款與撤銷訂單保留，以支援終身授權及交易核對；未付款訂單於 30 天後刪除。流量限制用的 IP 雜湊桶最多保留 2 天。Cloudflare 與 SHOPLINE Payments 另依其政策處理連線資料。</p><p>請妥善保存 Email 與序號，任何持有兩者的人皆可恢復授權。本系統不提供公開 Email 查序號。</p><p>存取、更正、刪除資料或退款需求：<a href="mailto:acsd6850@hotmail.com">acsd6850@hotmail.com</a>。刪除授權資料將失去線上恢復能力。</p>');
   fail(404,'not_found');
 }
 export default {
@@ -230,5 +287,8 @@ export default {
       env.DB.prepare('DELETE FROM rate_limits WHERE expires_at < ?').bind(now),
       env.DB.prepare("DELETE FROM orders WHERE status='pending' AND created_at < ?").bind(now-30*86400)
     ]);
+    // 補寄尚未寄出的序號信（寄信服務暫時失敗時）。
+    const unsent=await env.DB.prepare("SELECT * FROM orders WHERE status='paid' AND email_sent_at IS NULL AND paid_at > ? LIMIT 20").bind(now-7*86400).all?.();
+    for(const row of unsent?.results ?? []) await sendSerialMail(env,row);
   }
 };

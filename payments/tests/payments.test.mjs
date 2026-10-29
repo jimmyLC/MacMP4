@@ -6,9 +6,9 @@ import worker from '../src/worker.mjs';
 import {bytes,randomToken,hmacHex,verifyWebhookSignature,unbase64url} from '../src/crypto.mjs';
 function database() {
   const raw=new DatabaseSync(':memory:');
-  for(const file of ['0001_orders.sql','0002_shopline.sql']) raw.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));
+  for(const file of ['0001_orders.sql','0002_shopline.sql','0003_devices_email.sql']) raw.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));
   return {raw,prepare(sql) {return {bind(...args) {return {
-    async first(){return raw.prepare(sql).get(...args) ?? null;},async run(){return raw.prepare(sql).run(...args);}
+    async first(){return raw.prepare(sql).get(...args) ?? null;},async all(){return {results:raw.prepare(sql).all(...args)};},async run(){return raw.prepare(sql).run(...args);}
   };}};},async batch(items){return Promise.all(items.map(i=>i.run()));}};
 }
 const SIGN_KEY='test-sign-key-0123456789';
@@ -17,6 +17,7 @@ async function setup(environment='staging') {
   return {DB:database(),PAYMENT_ENV:environment,CHECKOUT_ENABLED:'true',APPLE_PAY_ENABLED:'true',
     PUBLIC_BASE_URL:'https://pay.example.com',CALLBACK_BASE_URL:'https://callback.example.com',
     SHOPLINE_MERCHANT_ID:'merchant-1',SHOPLINE_API_KEY:'api-key-0123456789',SHOPLINE_SIGN_KEY:SIGN_KEY,
+    EMAIL:{sent:[],async send(message){this.sent.push(message);return {messageId:'m'+this.sent.length};}},
     DATA_KEY:randomToken(),LOOKUP_KEY:randomToken(),LICENSE_SIGNING_JWK:JSON.stringify(await crypto.subtle.exportKey('jwk',keys.privateKey)),keys};
 }
 // 模擬 SHOPLINE API；記錄每次呼叫，供斷言標頭與內容。
@@ -175,4 +176,54 @@ test('Webhook 沒到時：App 查詢待付款訂單會向 SHOPLINE 補查並入�
   sessionReply=body=>({sessionId:body.sessionId,status:'SUCCEEDED',paymentDetails:[{tradeOrderId:'T'+other.orderId,paymentStatus:'SUCCEEDED'}]});
   assert.deepEqual(await (await status(env,other)).json(),{status:'pending'});
   sessionReply=null;
+});
+
+const DEVICE_A='A'.repeat(24), DEVICE_B='B'.repeat(24), DEVICE_C='C'.repeat(24);
+const activate=(env,o,result,device,takeover=false)=>worker.fetch(post('/v1/licenses/activate',{email:o.email,serial:result.serial,deviceId:device,takeover}),env);
+async function paidOrder(env) {
+  const o=await order(env);await webhook(env,o);
+  const result=await (await worker.fetch(req('/v1/orders/'+o.orderId,{headers:{Authorization:'Bearer '+o.accessToken,'X-Device-Id':DEVICE_A}}),env)).json();
+  return {o,result};
+}
+test('付款後寄一封序號信，重送通知不會重複寄',async()=>{
+  const env=await setup(),o=await order(env);
+  await webhook(env,o);await webhook(env,o);await webhook(env,o);
+  assert.equal(env.EMAIL.sent.length,1);
+  const mail=env.EMAIL.sent[0],{serial}=await (await status(env,o)).json();
+  assert.equal(mail.to,'buyer@example.com');assert.match(mail.text,new RegExp(serial));assert.match(mail.html,new RegExp(serial));
+  assert.ok(env.DB.raw.prepare('SELECT email_sent_at FROM orders').get().email_sent_at);
+});
+test('寄信失敗不影響授權；排程會補寄一次',async()=>{
+  const env=await setup(),o=await order(env);
+  env.EMAIL.send=async()=>{throw Object.assign(new Error('down'),{code:'E_DELIVERY_FAILED'});};
+  await webhook(env,o);
+  assert.equal((await (await status(env,o)).json()).status,'paid');
+  assert.equal(env.DB.raw.prepare('SELECT email_sent_at FROM orders').get().email_sent_at,null);
+  const sent=[];env.EMAIL.send=async m=>{sent.push(m);return {messageId:'x'};};
+  await worker.scheduled(null,env);await worker.scheduled(null,env);
+  assert.equal(sent.length,1);
+});
+test('一台有效裝置：新裝置搶先啟用後，舊裝置的背景檢查失效',async()=>{
+  const env=await setup(),{o,result}=await paidOrder(env);
+  assert.equal((await activate(env,o,result,DEVICE_A)).status,200); // 付款的裝置
+  const blocked=await activate(env,o,result,DEVICE_B);assert.equal(blocked.status,409);assert.equal((await blocked.json()).error,'device_replaced');
+  assert.equal((await activate(env,o,result,DEVICE_B,true)).status,200); // 使用者明確在新裝置啟用
+  assert.equal((await activate(env,o,result,DEVICE_B)).status,200);
+  const old=await activate(env,o,result,DEVICE_A);assert.equal(old.status,409);assert.equal((await old.json()).error,'device_replaced');
+});
+test('24 小時內只能換一次機；滿 24 小時後可再換',async()=>{
+  const env=await setup(),{o,result}=await paidOrder(env);
+  assert.equal((await activate(env,o,result,DEVICE_B,true)).status,200);
+  const limited=await activate(env,o,result,DEVICE_C,true);assert.equal(limited.status,429);assert.equal((await limited.json()).error,'device_change_limited');
+  assert.equal((await activate(env,o,result,DEVICE_B)).status,200); // 目前裝置仍可用
+  env.DB.raw.prepare('UPDATE orders SET device_changed_at=device_changed_at-90000').run();
+  assert.equal((await activate(env,o,result,DEVICE_C,true)).status,200);
+});
+test('裝置識別格式錯誤與舊版 App 的處理',async()=>{
+  const env=await setup(),{o,result}=await paidOrder(env);
+  assert.equal((await worker.fetch(post('/v1/licenses/activate',{email:o.email,serial:result.serial}),env)).status,200); // 舊版：過渡期通過
+  assert.equal((await worker.fetch(post('/v1/licenses/activate',{email:o.email,serial:result.serial,deviceId:'short'}),env)).status,200);
+  env.REQUIRE_DEVICE='true';
+  assert.equal((await worker.fetch(post('/v1/licenses/activate',{email:o.email,serial:result.serial}),env)).status,426);
+  assert.equal((await activate(env,o,result,DEVICE_A)).status,200);
 });

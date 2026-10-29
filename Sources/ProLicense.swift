@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import CryptoKit
 import Security
+import IOKit
 
 private final class NoPaymentRedirects: NSObject, URLSessionTaskDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
@@ -52,7 +53,7 @@ struct LicenseClaims: Codable {
 }
 
 enum LicenseError: LocalizedError {
-    case unavailable, invalid, storage, revoked, pending, request(String)
+    case unavailable, invalid, storage, revoked, pending, deviceReplaced, request(String)
     var errorDescription: String? {
         switch self {
         case .unavailable: return L("付款服務尚未設定完成，請稍後再試。")
@@ -60,17 +61,36 @@ enum LicenseError: LocalizedError {
         case .storage: return L("無法將授權資料儲存至鑰匙圈，請確認鑰匙圈已解鎖。")
         case .revoked: return L("此授權已停用，請聯絡客服。")
         case .pending: return L("尚未收到付款確認，可稍後再檢查。")
+        case .deviceReplaced: return L("此序號已在另一台電腦啟用，這台已變回 Free。要改在這台使用，請在「已有序號？恢復 Pro」輸入 Email 與序號。")
         case .request(let code):
             switch code {
             case "rate_limited": return L("操作太頻繁，請稍後再試。")
             case "pending_limit": return L("未完成訂單較多，請聯絡客服協助確認付款。")
             case "checkout_expired": return L("付款連結已過期，請聯絡客服協助處理訂單。")
+            case "device_change_limited": return L("24 小時內只能更換一次使用的電腦，請稍後再試，或聯絡客服。")
+            case "update_required": return L("請先更新 MacMP4 到最新版本。")
             default: return L("目前無法連線至付款服務，請稍後再試。")
             }
         }
     }
 }
 
+/// 這台 Mac 的穩定識別（硬體 UUID 加 App 專用字串後雜湊）。只送出雜湊，伺服器無法還原硬體 UUID。
+func licenseDeviceID() -> String {
+    var uuid = ""
+    let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
+    if service != 0 {
+        uuid = (IORegistryEntryCreateCFProperty(service, "IOPlatformUUID" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String) ?? ""
+        IOObjectRelease(service)
+    }
+    if uuid.isEmpty {
+        let key = "LicenseFallbackDeviceID"
+        uuid = UserDefaults.standard.string(forKey: key) ?? UUID().uuidString
+        UserDefaults.standard.set(uuid, forKey: key)
+    }
+    let digest = SHA256.hash(data: Data(("macmp4.device.v1:" + uuid).utf8))
+    return Data(digest).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+}
 func normalizedLicenseEmail(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
 func decodeBase64URL(_ value: String) -> Data? {
     let base = value.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
@@ -153,6 +173,7 @@ final class ProLicenseStore: ObservableObject {
     private let configuration: ProConfiguration?
     private let vault: LicenseVault
     private let session: URLSession
+    private let deviceID: String
     private var record = LicenseRecord()
     private weak var access: AppAccess?
     private var started = false
@@ -164,7 +185,8 @@ final class ProLicenseStore: ObservableObject {
     var canPurchase: Bool { isConfigured && options?.checkoutEnabled == true }
     var applePayAvailable: Bool { options?.methods.contains("ApplePay") == true }
 
-    init(configuration: ProConfiguration? = .bundled(), vault: LicenseVault? = nil, session: URLSession? = nil) {
+    init(configuration: ProConfiguration? = .bundled(), vault: LicenseVault? = nil, session: URLSession? = nil, deviceID: String? = nil) {
+        self.deviceID = deviceID ?? licenseDeviceID()
         self.configuration = configuration; self.vault = vault ?? KeychainLicenseVault(environment: configuration?.environment ?? "production"); self.session = session ?? privatePaymentSession()
     }
     @MainActor func resume(access: AppAccess) async {
@@ -270,9 +292,14 @@ final class ProLicenseStore: ObservableObject {
         guard !isBusy else { return }
         isBusy = true; if !quietly { message = nil }; defer { isBusy = false }
         do {
-            let reply: PaidReply = try await call("/v1/licenses/activate", body: ["email":normalizedLicenseEmail(email),"serial":serial])
+            // 背景檢查（啟動時）不會搶走其他電腦的授權；使用者按「啟用 Pro」才會改由這台使用。
+            let reply: PaidReply = try await call("/v1/licenses/activate", body: ["email":normalizedLicenseEmail(email),"serial":serial,"deviceId":deviceID,"takeover":quietly ? "false" : "true"])
             try accept(reply, expectedEmail: normalizedLicenseEmail(email))
             if !quietly { message = L("超級感謝！Pro 已啟用。") }
+        } catch LicenseError.deviceReplaced {
+            var updated = record; updated.licenseToken = ""
+            do { try persist(updated); publishRecord() } catch { message = error.localizedDescription }
+            access?.updateEntitlement(.free); message = LicenseError.deviceReplaced.localizedDescription
         } catch LicenseError.revoked {
             var updated = record; updated.licenseToken = ""
             do { try persist(updated); publishRecord() } catch { message = error.localizedDescription }
@@ -297,6 +324,7 @@ final class ProLicenseStore: ObservableObject {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        request.setValue(deviceID, forHTTPHeaderField: "X-Device-Id")
         if let token { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
         if let body { request.httpBody = try JSONEncoder().encode(body) }
         let (data, response) = try await session.data(for: request)
@@ -304,6 +332,7 @@ final class ProLicenseStore: ObservableObject {
         guard (200..<300).contains(http.statusCode) else {
             let code = (try? JSONDecoder().decode(ServiceFailure.self, from: data))?.error ?? "service_unavailable"
             if code == "license_revoked" { throw LicenseError.revoked }
+            if code == "device_replaced" { throw LicenseError.deviceReplaced }
             if code == "invalid_license" { throw LicenseError.invalid }
             throw LicenseError.request(code)
         }
