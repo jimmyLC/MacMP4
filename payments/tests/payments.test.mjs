@@ -72,6 +72,8 @@ test('固定金額、加密、冪等、結帳導轉與訂單查詢權限',async(
   assert.equal(call.body.amount.value,9000);assert.equal(call.body.amount.currency,'TWD');
   assert.deepEqual(call.body.allowPaymentMethodList,['ApplePay']);assert.equal(call.body.referenceId,o.orderId);
   assert.equal(call.body.returnUrl,'https://pay.example.com/thanks');
+  assert.equal(call.body.order.shipping.shippingMethod,'digital');assert.equal(call.body.order.shipping.address.countryCode,'TW');
+  assert.equal(call.body.billing.address.countryCode,'TW');
   assert.equal(call.headers.merchantId,'merchant-1');assert.equal(call.headers.apiKey,'api-key-0123456789');
   assert.match(call.headers.requestId,/^[0-9a-f]{32}$/);
   assert.doesNotMatch(JSON.stringify(call.body),/api-key-0123456789|test-sign-key/);

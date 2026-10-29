@@ -118,11 +118,14 @@ async function createSession(request,env,cfg,row) {
   // 規格核對：2026-10-29 https://docs.shoplinepayments.com/api/trade/session/；固定伺服器端價格，拒絕前端指定金額。
   const {email}=await unseal(row.private_data,env.DATA_KEY);
   const person={firstName:'Customer',lastName:'MacMP4',email};
+  const address={countryCode:'TW',street:'N/A'};
   const data=await shoplineCall(env,cfg,'/api/v1/trade/sessions/create',{
     referenceId:row.id, language:'zh-TW', amount:{value:AMOUNT_MINOR,currency:'TWD'}, expireTime:60,
     returnUrl:`${cfg.base}/thanks`, mode:'regular', allowPaymentMethodList:[METHODS[row.method]],
-    order:{products:[{id:PRODUCT,name:'MacMP4 Pro Lifetime',quantity:1,amount:{value:AMOUNT_MINOR,currency:'TWD'}}]},
-    customer:{referenceCustomerId:row.id,personalInfo:person}, billing:{personalInfo:person},
+    // 2026-10-29 實測正式 API：數位商品仍要求 order.shipping 與 billing.address，填佔位值即可。
+    order:{products:[{id:PRODUCT,name:'MacMP4 Pro Lifetime',quantity:1,amount:{value:AMOUNT_MINOR,currency:'TWD'}}],
+      shipping:{shippingMethod:'digital',carrier:'digital',personalInfo:person,address}},
+    customer:{referenceCustomerId:row.id,personalInfo:person}, billing:{personalInfo:person,address},
     client:{ip:request.headers.get('CF-Connecting-IP') ?? '127.0.0.1'}
   },row.id);
   let target;
