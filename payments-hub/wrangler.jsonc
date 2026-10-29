@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jimmy-tools-pay-hub",
+  "main": "src/worker.mjs",
+  "account_id": "d4783f0367eb11b6cde514f3ff9b725e",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "observability": { "enabled": false },
+  "routes": [{ "pattern": "pay.jimmy-tools.com", "custom_domain": true }],
+  "services": [{ "binding": "MACMP4", "service": "macmp4-payments" }]
+}
