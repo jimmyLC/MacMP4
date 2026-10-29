@@ -5,7 +5,7 @@ const environment=process.argv[2];
 if(!['staging','production'].includes(environment))throw new Error('指定 staging 或 production');
 const file=new URL(environment==='production'?'../.dev.vars.production':'../.dev.vars',import.meta.url);
 const all={};for(const line of (await readFile(file,'utf8')).split('\n')){const i=line.indexOf('=');if(i>0)all[line.slice(0,i)]=line.slice(i+1);}
-const secrets={};for(const key of ['ECPAY_MERCHANT_ID','ECPAY_HASH_KEY','ECPAY_HASH_IV','DATA_KEY','LOOKUP_KEY','LICENSE_SIGNING_JWK']) {
+const secrets={};for(const key of ['SHOPLINE_MERCHANT_ID','SHOPLINE_API_KEY','SHOPLINE_SIGN_KEY','DATA_KEY','LOOKUP_KEY','LICENSE_SIGNING_JWK']) {
   if(!all[key])throw new Error(`缺少 ${key}`);secrets[key]=all[key];
 }
 const args=['secret','bulk','--config','wrangler.jsonc'];if(environment==='production')args.push('--env','production');

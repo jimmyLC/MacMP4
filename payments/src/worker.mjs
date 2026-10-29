@@ -1,4 +1,4 @@
-import {base64url, randomToken, sha256, keyedHash, checkMacValue, verifyMac, seal, unseal, signLicense, normalizeEmail} from './crypto.mjs';
+import {base64url, randomToken, sha256, keyedHash, verifyWebhookSignature, seal, unseal, signLicense, normalizeEmail} from './crypto.mjs';
 const PRODUCT = 'macmp4-pro-lifetime';
 const HEADERS = {'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer', 'X-Content-Type-Options':'nosniff',
   'X-Frame-Options':'DENY', 'X-Robots-Tag':'noindex, nofollow', 'Permissions-Policy':'camera=(), microphone=(), geolocation=()'};
@@ -13,18 +13,15 @@ function origin(value) {
 }
 export function configuration(env) {
   if (!['staging','production'].includes(env.PAYMENT_ENV)) fail(503,'not_configured');
-  if (!/^\d{5,10}$/.test(env.ECPAY_MERCHANT_ID ?? '') || ![16,32].includes(env.ECPAY_HASH_KEY?.length) || env.ECPAY_HASH_IV?.length !== 16) fail(503,'not_configured');
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(env.SHOPLINE_MERCHANT_ID ?? '') || !/^\S{8,200}$/.test(env.SHOPLINE_API_KEY ?? '') || !/^\S{8,200}$/.test(env.SHOPLINE_SIGN_KEY ?? '')) fail(503,'not_configured');
   for (const key of ['DATA_KEY','LOOKUP_KEY']) if (!/^[A-Za-z0-9_-]{43}$/.test(env[key] ?? '')) fail(503,'not_configured');
   if (env.DATA_KEY === env.LOOKUP_KEY) fail(503,'not_configured');
   const signing = JSON.parse(env.LICENSE_SIGNING_JWK ?? '{}');
   if (signing.kty !== 'EC' || signing.crv !== 'P-256' || !signing.d || !signing.x || !signing.y) fail(503,'not_configured');
-  if (env.PAYMENT_ENV === 'production' && (env.ECPAY_MERCHANT_ID === '3002607' || env.ECPAY_HASH_KEY === 'pwFHCqoQZGmho4w6')) fail(503,'test_credentials_in_production');
-  if (env.PAYMENT_ENV === 'staging' && env.ECPAY_MERCHANT_ID !== '3002607') fail(503,'production_credentials_in_staging');
   return {base:origin(env.PUBLIC_BASE_URL), callback:origin(env.CALLBACK_BASE_URL),
-    action:env.PAYMENT_ENV === 'production' ? 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5' : 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'};
+    api:env.PAYMENT_ENV === 'production' ? 'https://api.shoplinepayments.com' : 'https://api-sandbox.shoplinepayments.com'};
 }
-async function body(request, type) {
-  if (!(request.headers.get('Content-Type') ?? '').toLowerCase().startsWith(type)) fail(415,'content_type');
+async function bodyText(request) {
   const reader = request.body?.getReader();
   if (!reader) fail(400,'invalid_body');
   const chunks=[]; let length=0;
@@ -32,7 +29,11 @@ async function body(request, type) {
     if(length>16384) { await reader.cancel(); fail(413,'body_too_large'); } chunks.push(value); }
   const all = new Uint8Array(length); let offset=0;
   for(const chunk of chunks) { all.set(chunk,offset); offset+=chunk.byteLength; }
-  const value = new TextDecoder('utf-8',{fatal:true}).decode(all);
+  try { return new TextDecoder('utf-8',{fatal:true}).decode(all); } catch { fail(400,'invalid_body'); }
+}
+async function body(request, type) {
+  if (!(request.headers.get('Content-Type') ?? '').toLowerCase().startsWith(type)) fail(415,'content_type');
+  const value = await bodyText(request);
   if(type==='application/json') { try { const parsed=JSON.parse(value); if(!parsed || typeof parsed!=='object' || Array.isArray(parsed)) fail(400,'invalid_json'); return parsed; } catch { fail(400,'invalid_json'); } }
   const params=new URLSearchParams(value), result={};
   for (const [key,val] of params) { if(Object.hasOwn(result,key)) fail(400,'duplicate_parameter'); result[key]=val; }
@@ -98,44 +99,70 @@ async function orderStatus(request,env,id) {
   if(!row) fail(404,'order_not_found');
   return json(await paidResult(row,env));
 }
-export function taiwanDate(timestamp) { return new Date(timestamp+8*3600000).toISOString().slice(0,19).replaceAll('-','/').replace('T',' '); }
-function escapeHTML(value) { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function html(content, action="'none'") {
   return new Response(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex,nofollow"><title>MacMP4 超級感謝</title><style>body{font:17px system-ui;max-width:32rem;margin:12vh auto;padding:24px;color:#1d2433;background:#f4f6f9}button{padding:14px 24px;background:#0061cc;color:white;border:0;border-radius:12px;font:inherit}a{color:#0061cc}</style><main>${content}</main></html>`,
     {headers:{...HEADERS,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':`default-src 'none'; style-src 'unsafe-inline'; form-action ${action}; frame-ancestors 'none'; base-uri 'none'`}});
 }
-async function checkout(env,cfg,id,token) {
+const METHODS = {ApplePay:'ApplePay', Credit:'CreditCard'};
+const AMOUNT_MINOR = 9000; // NT$90 × 100
+const requestId = () => [...crypto.getRandomValues(new Uint8Array(16))].map(n=>n.toString(16).padStart(2,'0')).join('');
+async function shoplineCall(env,cfg,path,payload,idempotentKey) {
+  const headers={'Content-Type':'application/json', merchantId:env.SHOPLINE_MERCHANT_ID, apiKey:env.SHOPLINE_API_KEY, requestId:requestId()};
+  if(idempotentKey) headers.idempotentKey=idempotentKey;
+  const response=await fetch(cfg.api+path,{method:'POST',headers,body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});
+  const data=await response.json().catch(()=>null);
+  if(!response.ok || !data) fail(502,'provider_error');
+  return data;
+}
+async function createSession(request,env,cfg,row) {
+  // 規格核對：2026-10-29 https://docs.shoplinepayments.com/api/trade/session/；固定伺服器端價格，拒絕前端指定金額。
+  const {email}=await unseal(row.private_data,env.DATA_KEY);
+  const person={firstName:'Customer',lastName:'MacMP4',email};
+  const data=await shoplineCall(env,cfg,'/api/v1/trade/sessions/create',{
+    referenceId:row.id, language:'zh-TW', amount:{value:AMOUNT_MINOR,currency:'TWD'}, expireTime:60,
+    returnUrl:`${cfg.base}/thanks`, mode:'regular', allowPaymentMethodList:[METHODS[row.method]],
+    order:{products:[{id:PRODUCT,name:'MacMP4 Pro Lifetime',quantity:1,amount:{value:AMOUNT_MINOR,currency:'TWD'}}]},
+    customer:{referenceCustomerId:row.id,personalInfo:person}, billing:{personalInfo:person},
+    client:{ip:request.headers.get('CF-Connecting-IP') ?? '127.0.0.1'}
+  },row.id);
+  let target;
+  try { target=new URL(data.sessionUrl); } catch { fail(502,'provider_error'); }
+  if(target.protocol!=='https:' || !target.hostname.endsWith('.shoplinepayments.com') || data.referenceId!==row.id || !data.sessionId) fail(502,'provider_error');
+  await env.DB.prepare("UPDATE orders SET session_id=?,session_url=? WHERE id=? AND environment=? AND status='pending'")
+    .bind(data.sessionId,target.href,row.id,env.PAYMENT_ENV).run();
+  return target.href;
+}
+async function checkout(request,env,cfg,id,token) {
   if(!tokenValid(token)) fail(404,'not_found');
   const row=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND checkout_hash=? AND environment=?').bind(id,await sha256(token),env.PAYMENT_ENV).first();
   if(!row) fail(404,'not_found');
   if(row.status!=='pending') return html('<h1>返回 MacMP4</h1><p>請在 App 中檢查此筆訂單狀態。</p>');
   if(env.CHECKOUT_ENABLED!=='true') fail(503,'checkout_unavailable');
   if(Date.now()/1000-row.created_at>3600) fail(410,'checkout_expired');
-  // 規格即時核對：2026-10-28，2862.md、7328.md；固定伺服器端價格，拒絕前端指定金額。
-  const params={MerchantID:env.ECPAY_MERCHANT_ID, MerchantTradeNo:row.id, MerchantTradeDate:taiwanDate(row.created_at*1000),
-    PaymentType:'aio', TotalAmount:'90', TradeDesc:'MacMP4 Pro', ItemName:'MacMP4 Pro Lifetime',
-    ReturnURL:`${cfg.callback}/ecpay/notify`, ClientBackURL:`${cfg.base}/thanks`,
-    ChoosePayment:row.method, EncryptType:'1', NeedExtraPaidInfo:'N', ItemURL:'https://jimmy-tools.com/MacMP4/'};
-  params.CheckMacValue=await checkMacValue(params,env.ECPAY_HASH_KEY,env.ECPAY_HASH_IV);
-  const fields=Object.entries(params).map(([k,v])=>`<input type="hidden" name="${escapeHTML(k)}" value="${escapeHTML(v)}">`).join('');
-  return html(`<h1>超級感謝</h1><p>MacMP4 Pro · NT$90 終身買斷</p><p>${env.PAYMENT_ENV==='staging'?'測試環境，不會真的扣款。':'付款完成後，請回到 App，自動啟用 Pro。'}</p><p>本商店僅支援台灣發行的信用卡，暫不支援海外發行信用卡。</p><form method="post" action="${cfg.action}">${fields}<button type="submit">${row.method==='ApplePay'?'使用 Apple Pay 付款':'信用卡付款'}</button></form><p>購買資訊由 App 填寫；卡片資料直接交由綠界處理。</p><p><a href="/privacy">隱私說明</a> · <a href="mailto:acsd6850@hotmail.com">客服信箱</a></p>`,new URL(cfg.action).origin);
+  const target=row.session_url ?? await createSession(request,env,cfg,row);
+  return new Response(null,{status:302,headers:{...HEADERS,Location:target}});
 }
-async function notify(request,env) {
-  // 付款通知規格：2026-10-28 https://developers.ecpay.com.tw/2878.md、2858.md。
-  const params=await body(request,'application/x-www-form-urlencoded');
-  if(!await verifyMac(params,env.ECPAY_HASH_KEY,env.ECPAY_HASH_IV)) return text('0|Invalid signature');
-  if(params.MerchantID!==env.ECPAY_MERCHANT_ID) return text('0|Merchant mismatch');
-  const row=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND environment=?').bind(params.MerchantTradeNo ?? '',env.PAYMENT_ENV).first();
-  if(!row || params.TradeAmt!==String(row.amount)) return text('0|Order mismatch');
-  if(env.PAYMENT_ENV==='production' && params.SimulatePaid!=='0') return text('0|Simulation rejected');
-  if(!['0','1'].includes(params.SimulatePaid)) return text('0|Invalid simulation');
-  if(params.RtnCode!=='1') return text('1|OK'); // 授權失敗不覆寫已付款狀態，後續有效成功通知仍可處理。
-  if(!/^[A-Za-z0-9]{1,20}$/.test(params.TradeNo ?? '')) return text('0|Invalid trade');
-  if(row.status==='paid' && row.provider_trade_no!==params.TradeNo) return text('0|Trade mismatch');
-  // 單一原子更新；重複、併發、亂序與已撤銷的通知皆不重發授權。
+async function webhook(request,env,cfg) {
+  // 通知規格：2026-10-29 shopline-payments-skill references/webhook.md。必須用原始 body 驗簽。
+  const timestamp=request.headers.get('timestamp') ?? '', sign=request.headers.get('sign');
+  const raw=await bodyText(request);
+  if(!/^\d{13}$/.test(timestamp) || Math.abs(Date.now()-Number(timestamp))>5*60*1000) fail(401,'timestamp');
+  if(!await verifyWebhookSignature(timestamp,raw,sign,env.SHOPLINE_SIGN_KEY)) fail(401,'signature');
+  let event; try { event=JSON.parse(raw); } catch { fail(400,'invalid_json'); }
+  if(event?.type!=='trade.succeeded') return text('OK'); // 其他事件只確認收到，不改變授權狀態。
+  const data=event.data ?? {};
+  const row=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND environment=?').bind(String(data.referenceOrderId ?? ''),env.PAYMENT_ENV).first();
+  if(!row || row.status==='revoked') return text('OK');
+  if(!/^[A-Za-z0-9_-]{1,64}$/.test(data.tradeOrderId ?? '')) return text('OK');
+  if(row.status==='paid') return text('OK'); // 重送：已付款不重發授權。
+  // 不單信 Webhook 內容：再向 SHOPLINE 查詢，確認訂單、金額與狀態。
+  const trade=await shoplineCall(env,cfg,'/api/v1/trade/payment/get',{tradeOrderId:data.tradeOrderId});
+  const paid=trade.paidAmount ?? {};
+  if(trade.status!=='SUCCEEDED' || trade.referenceOrderId!==row.id || trade.tradeOrderId!==data.tradeOrderId
+    || paid.value!==AMOUNT_MINOR || paid.currency!=='TWD') return text('OK');
   await env.DB.prepare("UPDATE orders SET status='paid',paid_at=?,provider_trade_no=? WHERE id=? AND environment=? AND status='pending'")
-    .bind(Math.floor(Date.now()/1000),params.TradeNo,row.id,env.PAYMENT_ENV).run();
-  return text('1|OK');
+    .bind(Math.floor(Date.now()/1000),data.tradeOrderId,row.id,env.PAYMENT_ENV).run();
+  return text('OK');
 }
 async function activate(request,env,cfg) {
   rejectBrowserMutation(request,cfg.base); await rateLimit(request,env,'activate',10);
@@ -156,11 +183,11 @@ export async function handle(request,env) {
   const status=path.match(/^\/v1\/orders\/([A-Z0-9]{20})$/);
   if(status && request.method==='GET') return orderStatus(request,env,status[1]);
   if(path==='/v1/licenses/activate' && request.method==='POST') return activate(request,env,cfg);
-  if(path==='/ecpay/notify' && request.method==='POST') return notify(request,env);
+  if(path==='/shopline/webhook' && request.method==='POST') return webhook(request,env,cfg);
   const page=path.match(/^\/checkout\/([A-Z0-9]{20})$/);
-  if(page && request.method==='GET') return checkout(env,cfg,page[1],url.searchParams.get('token'));
+  if(page && request.method==='GET') return checkout(request,env,cfg,page[1],url.searchParams.get('token'));
   if(path==='/thanks' && request.method==='GET') return html('<h1>請回到 MacMP4</h1><p>App 會向伺服器確認付款結果，再自動啟用 Pro。這個頁面不會直接啟用授權。</p><p>尚未啟用時，請在 App 按「檢查付款」。</p>');
-  if(path==='/privacy' && request.method==='GET') return html('<h1>MacMP4 Pro 隱私說明</h1><p>開發者：JimmyLC。購買時提供的 Email 與序號會加密保存於 Cloudflare D1，僅用於授權、重裝啟用與客服。付款資料由綠界處理，MacMP4 不儲存卡號。影片保留於你的電腦，不會上傳。</p><p>已付款與撤銷訂單保留，以支援終身授權及交易核對；未付款訂單於 30 天後刪除。流量限制用的 IP 雜湊桶最多保留 2 天。Cloudflare 與綠界另依其政策處理連線資料。</p><p>請妥善保存 Email 與序號，任何持有兩者的人皆可恢復授權。本系統不提供公開 Email 查序號。</p><p>存取、更正、刪除資料或退款需求：<a href="mailto:acsd6850@hotmail.com">acsd6850@hotmail.com</a>。刪除授權資料將失去線上恢復能力。</p>');
+  if(path==='/privacy' && request.method==='GET') return html('<h1>MacMP4 Pro 隱私說明</h1><p>開發者：JimmyLC。購買時提供的 Email 與序號會加密保存於 Cloudflare D1，僅用於授權、重裝啟用與客服。付款資料由 SHOPLINE Payments 處理，MacMP4 不儲存卡號。影片保留於你的電腦，不會上傳。</p><p>已付款與撤銷訂單保留，以支援終身授權及交易核對；未付款訂單於 30 天後刪除。流量限制用的 IP 雜湊桶最多保留 2 天。Cloudflare 與 SHOPLINE Payments 另依其政策處理連線資料。</p><p>請妥善保存 Email 與序號，任何持有兩者的人皆可恢復授權。本系統不提供公開 Email 查序號。</p><p>存取、更正、刪除資料或退款需求：<a href="mailto:acsd6850@hotmail.com">acsd6850@hotmail.com</a>。刪除授權資料將失去線上恢復能力。</p>');
   fail(404,'not_found');
 }
 export default {

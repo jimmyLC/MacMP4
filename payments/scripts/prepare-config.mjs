@@ -12,7 +12,6 @@ try {
   const source=await readFile(path,'utf8');
   for(const line of source.split('\n')){const i=line.indexOf('=');if(i>0)values[line.slice(0,i)]=line.slice(i+1);}
 } catch(e){if(e.code!=='ENOENT')throw e;}
-if(environment==='staging')Object.assign(values,{ECPAY_MERCHANT_ID:'3002607',ECPAY_HASH_KEY:'pwFHCqoQZGmho4w6',ECPAY_HASH_IV:'EkRm7iFT261dpevs'});
 if(!values.LICENSE_SIGNING_JWK){
   const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
   values.LICENSE_SIGNING_JWK=JSON.stringify(await crypto.subtle.exportKey('jwk',pair.privateKey));
@@ -25,4 +24,5 @@ const publicRaw=Buffer.concat([Buffer.from([4]),Buffer.from(unbase64url(jwk.x)),
 const publicConfig={enabled:false,apiBaseURL:apiURL,environment,publicKey:publicRaw.toString('base64')};
 const output=new URL(`../ProConfiguration.${environment}.public.json`,import.meta.url);
 await writeFile(output,JSON.stringify(publicConfig,null,2)+'\n');
+for(const key of ['SHOPLINE_MERCHANT_ID','SHOPLINE_API_KEY','SHOPLINE_SIGN_KEY'])if(!values[key])console.log(`尚缺 ${key}：請自行填入 ${path.pathname}（不要貼到聊天或 git）。`);
 console.log(`已準備 ${environment} 本機私密設定（600）及對應的公開設定。收款維持關閉；未部署。`);

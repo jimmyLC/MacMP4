@@ -171,6 +171,6 @@ The support entry is **Super Thanks**, with a heart-and-dollar icon. The panel d
 
 ## Pro payment integration
 
-An ECPay checkout and signed lifetime license flow is built in, with a separate Cloudflare Worker/D1 backend. Pro costs NT$90 once; conversion remains free. This store currently accepts Taiwan-issued credit cards only. See [integration and release gates](docs/ECPAY_INTEGRATION.md).
+A SHOPLINE Payments checkout and signed lifetime license flow is built in, with a separate Cloudflare Worker/D1 backend. Pro costs NT$90 once; conversion remains free. This store currently accepts Taiwan-issued credit cards only. See [integration and release gates](docs/SHOPLINE_INTEGRATION.md).
 
 After the first verified purchase, the app shows a brief fireworks celebration and a Pro welcome. License restoration does not replay it; Reduce Motion skips the animation.

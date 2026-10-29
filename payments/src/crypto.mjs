@@ -12,23 +12,19 @@ export async function keyedHash(secret, value) {
   const key = await crypto.subtle.importKey('raw', unbase64url(secret), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
   return base64url(await crypto.subtle.sign('HMAC', key, bytes(value)));
 }
-// 規格核對：2026-10-28 https://developers.ecpay.com.tw/2902.md
-// 翻譯基準：官方 SDK_PHP/src/Services/CheckMacValueService.php、UrlService.php。
-export async function checkMacValue(params, hashKey, hashIV) {
-  const sorted = Object.keys(params).filter(k => k.toLowerCase() !== 'checkmacvalue')
-    .sort((a,b) => a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0);
-  const source = `HashKey=${hashKey}&${sorted.map(k=>`${k}=${params[k]}`).join('&')}&HashIV=${hashIV}`;
-  const encoded = encodeURIComponent(source).replaceAll('~', '%7E').replaceAll("'", '%27').replaceAll('%20', '+').toLowerCase();
-  const digest = await crypto.subtle.digest('SHA-256', bytes(encoded));
-  return [...new Uint8Array(digest)].map(n=>n.toString(16).padStart(2,'0')).join('').toUpperCase();
+// SHOPLINE Webhook 簽章：HMAC-SHA256(`${timestamp}.${body}`, signKey)，十六進位。
+// 規格核對：2026-10-29 shopline-payments-skill references/webhook.md。
+export async function hmacHex(secret, value) {
+  const key = await crypto.subtle.importKey('raw', bytes(secret), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', key, bytes(value)))].map(n=>n.toString(16).padStart(2,'0')).join('');
 }
-export async function verifyMac(params, hashKey, hashIV) {
-  if (!/^[A-Fa-f0-9]{64}$/.test(params.CheckMacValue ?? '')) return false;
-  const expected = await checkMacValue(params, hashKey, hashIV);
-  // WebCrypto 的 HMAC verify 為時間安全比對，不以字串 == 比對機密。
-  const key = await crypto.subtle.importKey('raw', bytes(hashKey), {name:'HMAC', hash:'SHA-256'}, false, ['sign','verify']);
+export async function verifyWebhookSignature(timestamp, bodyString, sign, signKey) {
+  if (!/^[A-Fa-f0-9]{64}$/.test(sign ?? '')) return false;
+  const key = await crypto.subtle.importKey('raw', bytes(signKey), {name:'HMAC', hash:'SHA-256'}, false, ['sign','verify']);
+  const expected = await hmacHex(signKey, `${timestamp}.${bodyString}`);
   const tag = await crypto.subtle.sign('HMAC', key, bytes(expected));
-  return crypto.subtle.verify('HMAC', key, tag, bytes(params.CheckMacValue.toUpperCase()));
+  // WebCrypto 的 HMAC verify 為時間安全比對，不以字串 == 比對機密。
+  return crypto.subtle.verify('HMAC', key, tag, bytes(sign.toLowerCase()));
 }
 export async function seal(value, secret) {
   const key = await crypto.subtle.importKey('raw', unbase64url(secret), 'AES-GCM', false, ['encrypt']);

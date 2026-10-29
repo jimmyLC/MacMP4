@@ -170,6 +170,6 @@ Free 顯示 Free 標誌並固定使用淺色外觀。Pro 顯示 Pro 標誌，可
 
 ## Pro 金流串接
 
-App 內建綠界付款與簽章終身授權流程，後端為獨立 Cloudflare Worker／D1。Pro 為 NT$90 一次買斷，轉檔維持免費；本商店目前僅支援台灣發行的信用卡。詳見[串接與上線條件](docs/ECPAY_INTEGRATION.md)。
+App 內建 SHOPLINE Payments 付款與簽章終身授權流程，後端為獨立 Cloudflare Worker／D1。Pro 為 NT$90 一次買斷，轉檔維持免費；本商店目前僅支援台灣發行的信用卡。詳見[串接與上線條件](docs/SHOPLINE_INTEGRATION.md)。
 
 首次購買經確認後，App 會播放短暫煙火並顯示 Pro 歡迎訊息；恢復授權不會重播，開啟減少動態效果時則只顯示訊息。
