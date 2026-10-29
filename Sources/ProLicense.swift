@@ -91,6 +91,10 @@ func licenseDeviceID() -> String {
     let digest = SHA256.hash(data: Data(("macmp4.device.v1:" + uuid).utf8))
     return Data(digest).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
 }
+/// 購買信與付款頁使用 App 目前的語言（"zh-Hant" 或 "en"）。
+func licenseLanguage(override: String? = UserDefaults.standard.string(forKey: "AppLanguage"), preferred: [String] = Locale.preferredLanguages) -> String {
+    ((override ?? preferred.first ?? "en").lowercased().hasPrefix("zh")) ? "zh-Hant" : "en"
+}
 func normalizedLicenseEmail(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
 func decodeBase64URL(_ value: String) -> Data? {
     let base = value.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
@@ -241,7 +245,7 @@ final class ProLicenseStore: ObservableObject {
                 try persist(updated); publishRecord()
             }
             guard let pending = record.pending else { throw LicenseError.invalid }
-            let reply: OrderReply = try await call("/v1/orders", body: ["email":pending.email,"method":pending.method,"accessToken":pending.accessToken])
+            let reply: OrderReply = try await call("/v1/orders", body: ["email":pending.email,"method":pending.method,"accessToken":pending.accessToken,"language":licenseLanguage()])
             guard reply.amount == 90, reply.currency == "TWD", reply.environment == configuration?.environment,
                   let url = URL(string: reply.checkoutURL), url.scheme == "https", url.host == configuration?.baseURL?.host,
                   url.port == nil, url.user == nil, url.password == nil, url.path == "/checkout/" + reply.orderId,

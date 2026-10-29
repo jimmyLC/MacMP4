@@ -1,6 +1,7 @@
 // jimmy-tools 收款中樞：SHOPLINE 只登記這一個 Webhook，依訂單編號開頭轉給各產品 Worker。
 // 轉送前先驗簽章與時間戳；產品 Worker 收到後會再驗一次並向 SHOPLINE 查詢確認。
 import {hmacHex, verifyWebhookSignature} from './signature.mjs';
+import {ICON_BASE64} from './icon.mjs';
 export {hmacHex};
 // 訂單編號第一個字 → service binding 名稱。新增產品時在這裡與 wrangler.jsonc 各加一行。
 export const ROUTES = {M:'MACMP4'};
@@ -20,6 +21,8 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname==='/health') return reply('ok');
+    if (url.pathname==='/assets/macmp4-icon.png' && request.method==='GET')
+      return new Response(Uint8Array.from(atob(ICON_BASE64),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/png','Cache-Control':'public, max-age=604800','X-Content-Type-Options':'nosniff'}});
     if (url.pathname!=='/shopline/webhook' || request.method!=='POST') return reply('not found',404);
     const timestamp = request.headers.get('timestamp') ?? '', sign = request.headers.get('sign');
     const raw = await readBody(request);

@@ -1,3 +1,4 @@
+import {serialEmail} from './mail.mjs';
 import {base64url, randomToken, sha256, keyedHash, verifyWebhookSignature, seal, unseal, signLicense, normalizeEmail} from './crypto.mjs';
 const PRODUCT = 'macmp4-pro-lifetime';
 const HEADERS = {'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer', 'X-Content-Type-Options':'nosniff',
@@ -79,8 +80,8 @@ async function createOrder(request,env,cfg) {
   const serialHash=await sha256(serialCanonical(serial));
   const privateData=await seal({email,serial},env.DATA_KEY);
   const checkoutHash=await sha256(await checkoutKey(env,{id,access_hash:accessHash}));
-  await env.DB.prepare('INSERT OR IGNORE INTO orders(id,environment,product,amount,method,email_hash,serial_hash,private_data,access_hash,checkout_hash,created_at) VALUES(?,?,?,90,?,?,?,?,?,?,?)')
-    .bind(id,env.PAYMENT_ENV,PRODUCT,data.method,emailHash,serialHash,privateData,accessHash,checkoutHash,Math.floor(Date.now()/1000)).run();
+  await env.DB.prepare('INSERT OR IGNORE INTO orders(id,environment,product,amount,method,email_hash,serial_hash,private_data,access_hash,checkout_hash,created_at,language) VALUES(?,?,?,90,?,?,?,?,?,?,?,?)')
+    .bind(id,env.PAYMENT_ENV,PRODUCT,data.method,emailHash,serialHash,privateData,accessHash,checkoutHash,Math.floor(Date.now()/1000),data.language==='en'?'en':'zh-Hant').run();
   row=await env.DB.prepare('SELECT * FROM orders WHERE access_hash=? AND environment=?').bind(accessHash,env.PAYMENT_ENV).first();
   if(!row || row.email_hash!==emailHash || row.method!==data.method) fail(409,'order_conflict');
   return json(await orderView(env,row,cfg),201);
@@ -110,31 +111,12 @@ async function bindDevice(env,row,deviceId,takeover) {
     .bind(hash,now,row.id,hash,now-DEVICE_CHANGE_SECONDS).run();
   if(changes(moved)!==1) fail(429,'device_change_limited');
 }
-function serialEmail(serial) {
-  const subject='你的 MacMP4 Pro 序號';
-  const text=`感謝你支持 MacMP4！Pro 已在你付款的電腦上自動啟用。
-
-你的序號：
-${serial}
-
-換電腦或重灌時：
-1. 在新電腦安裝 MacMP4，打開「超級感謝」。
-2. 選「已有序號？恢復 Pro」，輸入購買時使用的 Email 與上面的序號。
-3. 啟用後，原本的電腦會在下次連線時變回 Free。同一組序號同一時間只能有一台電腦使用；24 小時內只能更換一次。
-
-請妥善保存這封信。任何人拿到 Email 與序號都能啟用，請不要公開分享。
-
-需要協助請直接回覆這封信，或寄到 contact@jimmy-tools.com。
-MacMP4 · jimmy-tools.com/MacMP4/`;
-  const html=`<div style="font:16px/1.7 -apple-system,system-ui,sans-serif;color:#1d2433;max-width:32rem"><p>感謝你支持 MacMP4！Pro 已在你付款的電腦上自動啟用。</p><p>你的序號：</p><p style="font:600 18px ui-monospace,Menlo,monospace;background:#f4f6f9;padding:14px 16px;border-radius:10px;letter-spacing:.5px">${serial}</p><p><b>換電腦或重灌時</b></p><ol><li>在新電腦安裝 MacMP4，打開「超級感謝」。</li><li>選「已有序號？恢復 Pro」，輸入購買時使用的 Email 與上面的序號。</li><li>啟用後，原本的電腦會在下次連線時變回 Free。同一組序號同一時間只能有一台電腦使用；24 小時內只能更換一次。</li></ol><p style="color:#5b6472;font-size:14px">請妥善保存這封信。任何人拿到 Email 與序號都能啟用，請不要公開分享。<br>需要協助請直接回覆這封信，或寄到 contact@jimmy-tools.com。</p></div>`;
-  return {subject,text,html};
-}
 /** 寄序號信。失敗不影響授權；email_sent_at 未設定時，排程會重試。 */
 export async function sendSerialMail(env,row) {
   if(!env.EMAIL || row.status!=='paid' || row.email_sent_at) return false;
   try {
     const {email,serial}=await unseal(row.private_data,env.DATA_KEY);
-    await env.EMAIL.send({to:email,from:{email:env.MAIL_FROM ?? 'contact@jimmy-tools.com',name:'MacMP4'},replyTo:env.MAIL_FROM ?? 'contact@jimmy-tools.com',...serialEmail(serial)});
+    await env.EMAIL.send({to:email,from:{email:env.MAIL_FROM ?? 'contact@jimmy-tools.com',name:'MacMP4'},replyTo:env.MAIL_FROM ?? 'contact@jimmy-tools.com',...serialEmail(serial,email,row.language)});
     await env.DB.prepare('UPDATE orders SET email_sent_at=? WHERE id=? AND email_sent_at IS NULL').bind(Math.floor(Date.now()/1000),row.id).run();
     return true;
   } catch { return false; }
@@ -178,7 +160,7 @@ async function createSession(request,env,cfg,row) {
   const person={firstName:'Customer',lastName:'MacMP4',email};
   const address={countryCode:'TW',street:'N/A'};
   const data=await shoplineCall(env,cfg,'/api/v1/trade/sessions/create',{
-    referenceId:row.id, language:'zh-TW', amount:{value:AMOUNT_MINOR,currency:'TWD'}, expireTime:60,
+    referenceId:row.id, language:row.language==='en'?'en':'zh-TW', amount:{value:AMOUNT_MINOR,currency:'TWD'}, expireTime:60,
     returnUrl:`${cfg.base}/thanks`, mode:'regular', allowPaymentMethodList:[METHODS[row.method]],
     // 2026-10-29 實測正式 API：數位商品仍要求 order.shipping 與 billing.address，填佔位值即可。
     order:{products:[{id:PRODUCT,name:'MacMP4 Pro Lifetime',quantity:1,amount:{value:AMOUNT_MINOR,currency:'TWD'}}],

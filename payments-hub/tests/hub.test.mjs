@@ -32,3 +32,8 @@ test('SHOPLINE 的 RL 編號不影響路由：用 order.customer.referenceCustom
   const e=env(),body=JSON.stringify({type:'trade.succeeded',data:{referenceOrderId:'RL0126102900977667489309682366',order:{customer:{referenceCustomerId:'MABC'}}}});
   assert.equal((await hook(e,{body})).status,200);assert.equal(e.seen.length,1);
 });
+test('提供信件用的小圖示',async()=>{
+  const r=await worker.fetch(new Request('https://pay.example.com/assets/macmp4-icon.png'),env());
+  assert.equal(r.status,200);assert.equal(r.headers.get('Content-Type'),'image/png');
+  const bytes=new Uint8Array(await r.arrayBuffer());assert.deepEqual([...bytes.slice(0,4)],[0x89,0x50,0x4e,0x47]);assert.ok(bytes.length<30000);
+});

@@ -227,3 +227,16 @@ test('裝置識別格式錯誤與舊版 App 的處理',async()=>{
   assert.equal((await worker.fetch(post('/v1/licenses/activate',{email:o.email,serial:result.serial}),env)).status,426);
   assert.equal((await activate(env,o,result,DEVICE_A)).status,200);
 });
+test('依 App 語言寄中文或英文序號信，並帶入 SHOPLINE 付款頁語言',async()=>{
+  calls.length=0;
+  const env=await setup(),zh=await order(env),en=await order(env,{language:'en'});
+  await worker.fetch(new Request(zh.checkoutURL),env);await worker.fetch(new Request(en.checkoutURL),env);
+  assert.equal(calls[0].body.language,'zh-TW');assert.equal(calls[1].body.language,'en');
+  await webhook(env,zh);await webhook(env,en);
+  const [zhMail,enMail]=env.EMAIL.sent;
+  assert.equal(zhMail.subject,'你的 MacMP4 Pro 序號');assert.match(zhMail.html,/感謝你的購買/);assert.match(zhMail.text,/換電腦時怎麼做/);
+  assert.equal(enMail.subject,'Your MacMP4 Pro serial number');assert.match(enMail.html,/Thank you for your purchase/);assert.match(enMail.text,/Switching to a new Mac/);
+  assert.doesNotMatch(enMail.html,/感謝|序號/);
+  assert.match(enMail.html,/https:\/\/pay\.jimmy-tools\.com\/assets\/macmp4-icon\.png/);
+  const odd=await order(env,{language:'fr'});assert.equal(env.DB.raw.prepare('SELECT language FROM orders WHERE id=?').get(odd.orderId).language,'zh-Hant');
+});
