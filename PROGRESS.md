@@ -45,3 +45,7 @@ On `feat/report-problem`: a job that has failed twice (first attempt plus one re
 ## Switch to SHOPLINE Payments — 2026-10-29
 
 Branch `feat/shopline-payments`: Worker now uses SHOPLINE redirect checkout + signed webhook + payment query (see `docs/SHOPLINE_INTEGRATION.md`). ECPay code removed from main line; restore point is tag `ecpay-final`. The deployed production Worker still runs the ECPay version until this branch is deployed. Needs from owner: sandbox merchantId/apiKey/signKey, webhook registration, sandbox end-to-end run. Taiwan-card-only wording in the app and checkout pages came from ECPay and must be re-checked against SHOPLINE.
+
+## v1.2.0 — 2026-10-29
+
+SHOPLINE Payments live (redirect checkout, signed webhook via pay.jimmy-tools.com hub, payment-query reconcile), serial email after payment (zh/en by app language, Cloudflare Email Sending from contact@jimmy-tools.com), one active device per serial with a 24h switch limit (`REQUIRE_DEVICE=true` on the Worker turns off legacy apps later). Verified live: credit card payment unlocked Pro. Still open: Apple Pay retry, serial email delivery check, refund of both test payments in the SHOPLINE backend, app/checkout wording "Taiwan-issued cards only" (left over from ECPay), site download links still point to v1.1.2.
