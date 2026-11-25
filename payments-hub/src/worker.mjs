@@ -4,7 +4,7 @@ import {hmacHex, verifyWebhookSignature} from './signature.mjs';
 import {ICON_BASE64} from './icon.mjs';
 export {hmacHex};
 // 訂單編號第一個字 → service binding 名稱。新增產品時在這裡與 wrangler.jsonc 各加一行。
-export const ROUTES = {M:'MACMP4'};
+export const ROUTES = {M:'MACMP4', F:'MACFLAC'};
 const HEADERS = {'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
 const reply = (body, status=200) => new Response(body, {status, headers:{...HEADERS,'Content-Type':'text/plain'}});
 async function readBody(request) {

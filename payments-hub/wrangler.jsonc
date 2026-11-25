@@ -7,5 +7,8 @@
   "workers_dev": false,
   "observability": { "enabled": false },
   "routes": [{ "pattern": "pay.jimmy-tools.com", "custom_domain": true }],
-  "services": [{ "binding": "MACMP4", "service": "macmp4-payments" }]
+  "services": [
+    { "binding": "MACMP4", "service": "macmp4-payments" },
+    { "binding": "MACFLAC", "service": "macflac-payments" }
+  ]
 }

@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import worker, {hmacHex} from '../src/worker.mjs';
 const KEY='hub-sign-key-0123456789';
-function env(upstreamStatus=200){const seen=[];return {SHOPLINE_SIGN_KEY:KEY,seen,MACMP4:{async fetch(url,init){seen.push({url,init});return new Response('OK',{status:upstreamStatus});}}};}
+function env(upstreamStatus=200){const seen=[],flac=[];return {SHOPLINE_SIGN_KEY:KEY,seen,flac,MACMP4:{async fetch(url,init){seen.push({url,init});return new Response('OK',{status:upstreamStatus});}},MACFLAC:{async fetch(url,init){flac.push({url,init});return new Response('OK',{status:upstreamStatus});}}};}
 async function hook(e,{id='MABC',timestamp=String(Date.now()),sign=true,body}={}) {
   const raw=body ?? JSON.stringify({type:'trade.succeeded',data:{referenceOrderId:id}});
   const signature=sign?await hmacHex(KEY,`${timestamp}.${raw}`):'0'.repeat(64);
@@ -36,4 +36,16 @@ test('提供信件用的小圖示',async()=>{
   const r=await worker.fetch(new Request('https://pay.example.com/assets/macmp4-icon.png'),env());
   assert.equal(r.status,200);assert.equal(r.headers.get('Content-Type'),'image/png');
   const bytes=new Uint8Array(await r.arrayBuffer());assert.deepEqual([...bytes.slice(0,4)],[0x89,0x50,0x4e,0x47]);assert.ok(bytes.length<30000);
+});
+
+test('F 開頭的訂單轉給 MacFlac，不會轉給 MacMP4（反之亦然）',async()=>{
+  const e=env();
+  assert.equal((await hook(e,{id:'FABC'})).status,200);
+  assert.equal(e.flac.length,1);assert.equal(e.seen.length,0);
+  assert.equal(e.flac[0].init.body,JSON.stringify({type:'trade.succeeded',data:{referenceOrderId:'FABC'}}));
+  assert.equal((await hook(e,{id:'MABC'})).status,200);
+  assert.equal(e.seen.length,1);assert.equal(e.flac.length,1);
+  const body=JSON.stringify({type:'trade.succeeded',data:{referenceOrderId:'RL0126',order:{customer:{referenceCustomerId:'FXYZ'}}}});
+  assert.equal((await hook(e,{body})).status,200);assert.equal(e.flac.length,2);assert.equal(e.seen.length,1);
+  const down={...env(503)};assert.equal((await hook(down,{id:'FABC'})).status,502);
 });
